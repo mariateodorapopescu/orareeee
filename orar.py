@@ -22,38 +22,15 @@ zile = data['Zile']
 # print(sali['EG324']['Capacitate'])
 # print(zile)
 
-# # now I need to define a state
-# # a state is the timetable itself, which is a 2d-multi-d array, 
-# # with day interval and each 'cell' is a dict of tuples pairs like room and tuple teacher - subject
-# # something like this orar['day']['interval'] = {'room': ('teacher', 'subject')}
+# now I need to define a state
+# a state is the timetable itself, which is a 2d-multi-d array, 
+# with day interval and each 'cell' is a dict of tuples pairs like room and tuple teacher - subject
+# something like this orar['day']['interval'] = {'room': ('teacher', 'subject')}
 
-# # acum am luat labul de MCTS si il modific =P
+# acum am luat labul de MCTS si il modific =P
 
-# state = []
-
-# # Dimensiunile matricei
-# HEIGHT, WIDTH = len(intervale), len(zile)
-
-# # Pozițiile din tuplul ce constituie o stare
-# TIMETABLE = 1 # am doar orar
-
-# # Funcție ce întoarce o stare inițială
-# def init_state():
-#     return ([[0 for row in range(HEIGHT)] for col in range(WIDTH)], 1)
-
-# # Funcție ce afișează o stare
-# def print_state(state):
-#     for row in range(HEIGHT-1, -1, -1):
-#         ch = " aici "
-#         l = map(lambda col: ch[state[TIMETABLE][col][row]], range(WIDTH))
-#         print("|" + "".join(l) + "|") # aici o sa fie interesant ca tre sa ma gandesc la cum fac prettify-ul
-#     print("+" + "".join("-" * WIDTH) + "+")
-#     print("Urmează: %d - %s" % (state[NEXT_PLAYER], name[state[NEXT_PLAYER]]))
-
-# # Se afișează starea inițială a jocului
-# print("Starea inițială:")
-# print_state(init_state())
-TIMETABLE = 1
+HEIGHT, WIDTH = len(intervale), len(zile)
+TIMETABLE, NEXT_VERSION = 0, 1
 # initialize state
 def __init_state__():
     state = {}
@@ -69,40 +46,130 @@ def __print_state__(state, TIMETABLE):
     print(state[TIMETABLE])
     
 state = __init_state__()
-__print_state__(state, TIMETABLE)
+# __print_state__(state, TIMETABLE)
 
-# Funcție ce întoarce acțiunile valide dintr-o stare dată
-def get_available_actions(state):
-    # TODO <1>
-    valid_action = []
-    orar = state[0]
-    j = 0
-    for i in orar:
-        if i[-1] == 0:
-            valid_action.append(j)
-        j += 1
+def __generate_actions__(materii, intervale, profi, sali, zile):
+    actions = []
+    for i in profi:
+        ore_ok = []
+        zile_ok = []
+        materii_prof = []
+        for j in profi[i]['Constrangeri']:
+            e_ora = 0
+            if '!' not in j:
+                for char in j:
+                    if char.isdigit():
+                        e_ora = 1
+                        break
+                if e_ora:
+                    start, end = map(int, j.split('-'))
+                    if start == 8:
+                        j='0'+j
+                    if (end - start) > 2:
+                        for ore in range (start, end, 2):
+                            endd = ore + 2
+                            if ore == 8:
+                                oree = '0'+str(ore)
+                            else:
+                                oree = str(ore)
+                            interv = oree + '-' + str(endd)
+                            ore_ok.append(interv)
+                    else:
+                        ore_ok.append(j)
+                else:
+                    zile_ok.append(j)
+        for j in profi[i]['Materii']:
+            materii_prof.append(j)
+        nume = None
+        nume = ''.join(char for char in i if char.isupper())
+        for j in materii_prof:
+            for k in ore_ok:
+                for l in zile_ok:
+                    for m in sali:
+                        if j in sali[m]['Materii']:
+                            for n in materii:
+                                dummy = (l, k, j, m, nume)
+                                actions.append(dummy)
+    good_actions = sorted(list(set(actions)), key=lambda x: (x[0], x[1], x[2]))
+    return good_actions
+                    
+actions = __generate_actions__(materii, intervale, profi, sali, zile)
+# now I generated all possibilities, but the rooms and students are not well put together
+# print(actions)
 
-    return valid_action
+def __possible_arranjaments__(actions, WIDTH, HEIGHT):
+    possibilities = [[[] for _ in range(WIDTH)] for _ in range(HEIGHT)]
+    for i in actions:
+        col, lin = 0, 0
+        if i[0] == 'Luni':
+            col = 0
+        elif i[0] == 'Marti':
+            col = 1
+        elif i[0] == 'Miercuri':
+            col = 2
+        elif i[0] == 'Joi':
+            col = 3
+        else:
+            col = 4
+
+        if i[1] == '08-10':
+            lin = 0
+        elif i[1] == '10-12':
+            lin = 1
+        elif i[1] == '12-14':
+            lin = 2
+        elif i[1] == '14-16':
+            lin = 3
+        elif i[1] == '16-18':
+            lin = 4
+        else:
+            lin = 5
+
+        dummy = (i[2], i[4], i[3])
+        possibilities[lin][col].append(dummy)
+    return possibilities
+        
+possibilities = __possible_arranjaments__(actions, WIDTH, HEIGHT)
+
+def __get_overlaps__(possibilities, sali):
+    overlaps = []
+    for index_i, i in enumerate(possibilities):
+        # ia pe zile
+        for index_j, j in enumerate(possibilities[index_i]):
+            for l in sali:
+                nr = 0
+                for k in j:
+                    if l in k:
+                        nr += 1
+                if nr >= 2:
+                    dummy = (l, index_j, index_i)
+                    overlaps.append(dummy)
+    return overlaps
+
+overlaps = __get_overlaps__(possibilities, sali, WIDTH, HEIGHT)
+
+def __get_aviable_actions__(possibilities, overlaps):
+    orarele = [[[[] for _ in range(WIDTH)] for _ in range(HEIGHT)] for _ in range(100)]
+    return orarele
 
 from copy import deepcopy
 from functools import reduce
 
 # Funcție ce întoarce starea în care se ajunge prin aplicarea unei acțiuni
-def apply_action(state, action):
-    if action >= len(state[TIMETABLE]) or 0 not in state[BOARD][action]:
+def __apply_action__(state, action, where):
+    # acum sa vedem cam ce inseamna o actiune
+    # o actiune poate fi pui materia cutare cu proful cutare la ora cutare in ziua cutare
+    # deci, action e (materie, prof), where e celula din tabel, adica zi si interval orar
+    # sala cred ca se va pune dupa
+    # if-ul cu action e destul de dubios, trebuie modificat
+    if action >= len(state[TIMETABLE]) or 0 not in state[TIMETABLE][action]:
         print("Action " + str(action) + " is not valid.")
         return None
-    new_board = deepcopy(state[BOARD])
-    new_board[action][new_board[action].index(0,0)] = state[NEXT_PLAYER]
-    return (new_board, 3 - state[NEXT_PLAYER])
+    new_timetable = deepcopy(state[TIMETABLE])
+    new_timetable[action][new_timetable[action].index(0,0)] = state[NEXT_VERSION]
+    return (new_timetable, 3 - state[NEXT_VERSION])
 
-
-# Se afișează starea la care se ajunge prin aplicarea unor acțiuni
-somestate = reduce(apply_action, [3, 4, 3, 2, 2, 6, 3, 3, 3, 3], init_state())
-print_state(somestate)
-get_available_actions(somestate)
-
-# # Funcție ce verifică dacă o stare este finală
+# Funcție ce verifică dacă o stare este finală
 # def is_final(state):
 #     # Verificăm dacă matricea este plină
 #     if not any([0 in col for col in state[BOARD]]): return 3
