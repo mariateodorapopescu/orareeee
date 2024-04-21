@@ -166,6 +166,7 @@ def __populate_cobai__(cobai, actions):
         cobai[i[0]][str(intv)][i[3]].append((i[2], i[4]))
         
 __populate_cobai__(cobai, longer)
+print(cobai)
 
 # gets the overlaps that occure in a dict
 def __get_overlaps__(cobai):
@@ -206,99 +207,23 @@ def __where__(action, sched, permisiuni, cobai):
             pos.append(posi)
     return pos
 
-# to be to from the laboratory
-# Funcție ce întoarce starea în care se ajunge prin aplicarea unei acțiuni
-def __apply_action__(state, action, where):
-    # acum sa vedem cam ce inseamna o actiune
-    # o actiune poate fi pui materia cutare cu proful cutare la ora cutare in ziua cutare
-    # deci, action e (materie, prof), where e celula din tabel, adica zi si interval orar
-    # sala cred ca se va pune dupa
-    # if-ul cu action e destul de dubios, trebuie modificat
-    if action >= len(state[TIMETABLE]) or 0 not in state[TIMETABLE][action]:
-        print("Action " + str(action) + " is not valid.")
-        return None
-    new_timetable = deepcopy(state[TIMETABLE])
-    new_timetable[action][new_timetable[action].index(0,0)] = state[NEXT_VERSION]
-    return (new_timetable, 3 - state[NEXT_VERSION])
+def __all_actions__(actions, permisiuni):
+    evryting = []
+    everything = []
+    for materie, cineva in actions:
+        nr = len(permisiuni[cineva]['zile_ok']) * len(permisiuni[cineva]['ore_ok'])
+        for _ in range(nr):
+            evryting.append((materie, cineva))
+    return evryting
 
-class State:
-    def __init__(
-        self, 
-        size: int, 
-        orar: list[list[list[tuple]]] | None = None, 
-        conflicts: int | None = None, 
-        seed: int = 100
-    ) -> None:
-        
-        self.size = size
-        self.orar = orar if orar is not None else State.generate_orar(size, seed)
-        self.nconflicts = conflicts if conflicts is not None \
-            else State.__compute_conflicts(self.orar)
-    
-    def apply_move(self, action: tuple) -> 'State':
-        day, interval, subject, room, teacher = action
-        old_orar = self.orar
-        new_orar = copy(self.orar)
-        new_orar[interval][day].append((subject, teacher, room))
-        _conflicts = self.nconflicts
-        for i, day in enumerate(new_orar):
-            for j, interval in enumerate(day):
-                if interval:
-                    overlaps = self.get_overlaps(new_orar)
-                    _conflicts = len(overlaps)
-        return State(self.size, new_orar, _conflicts)
-    
-    @staticmethod
-    def generate_orar(size: int, seed: int) -> list[list[list[tuple]]]:
-        random.seed(seed)
-        orar = [[[] for _ in range(size)] for _ in range(size)]
-        return orar
-    
-    @staticmethod
-    def __compute_conflicts(orar: list[list[list[tuple]]]) -> int:
-        conflicts = 0
-        for day in orar:
-            for interval in day:
-                for subject1, teacher1, room1 in interval:
-                    for subject2, teacher2, room2 in interval:
-                        if room1 == room2 and teacher1 == teacher2:
-                            conflicts += 1
-        return conflicts
-    
-    def get_overlaps(self, orar: list[list[list[tuple]]]) -> list[tuple]:
-        overlaps = []
-        for idx, day in enumerate(orar):
-            for interval in day:
-                for room in sali:
-                    nr = 0
-                    for subject, teacher, room_ in interval:
-                        if room == room_:
-                            nr += 1
-                    if nr >= 2:
-                        overlaps.append((room, idx, interval))
-        return overlaps
-    
-    def conflicts(self) -> int:
-        return self.nconflicts
-    
-    def is_final(self) -> bool:
-        return self.nconflicts == 0
-    
-    def get_next_states(self, actions: list[tuple]) -> list['State']:
-        return [self.apply_move(action) for action in actions]
-    
-    def __str__(self) -> str:
-        display = ''
-        for day, intervals in zip(zile, self.orar):
-            display += f"{day}\n"
-            for interval, data in zip(intervale, intervals):
-                display += f"{interval}:\n"
-                for subject, teacher, room in data:
-                    display += f"\tSubject: {subject}, Teacher: {teacher}, Room: {room}\n"
-        return display
-    
-    def display(self) -> None:
-        print(self)
-    
-    def clone(self) -> 'State':
-        return State(self.size, copy(self.orar), self.nconflicts)
+all_actions = __all_actions__(actions, permisiuni)
+
+def __get_all_possible_places__(all_actions, permisiuni, cobai, sched):
+    idk = {}
+    for act in all_actions:
+        idk[act] = []
+        dummy = __where__(act, sched, permisiuni, cobai)
+        idk[act] = dummy
+    return idk
+
+evriuere = __get_all_possible_places__(all_actions, permisiuni, cobai, sched)
