@@ -48,7 +48,7 @@ states.append(sched)
 def __print_state__(states, TIMETABLE):
     print(states[TIMETABLE])
     
-__print_state__(state, TIMETABLE)
+__print_state__(states, TIMETABLE)
 
 # generates all possible actions from the lists of days, intervals, teachers 
 # in order to satisfact the constraints of days and intervals for teachers
@@ -226,8 +226,6 @@ def __compute_conflicts__(sched):
                     teachers[teacher] = True
     return conflicts
 
-nr = __compute_conflicts__(sched)
-
 # it generates timetables/dicts with as little conflicts as possible
 def __generate__(matrix, zile, intervale, sched, remains):
     schedule_dict = sched
@@ -250,7 +248,7 @@ def __generate__(matrix, zile, intervale, sched, remains):
     return schedule_dict, remain
 
 # it deletes the duplicates from the generated dicts from above
-def __good_ones__(sched, remains):
+def __good_ones__(sched, remains, possibilities):
     good_ones = []
     new_sched = sched.copy()
     new_remain = remains.copy()
