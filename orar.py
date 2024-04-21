@@ -36,10 +36,10 @@ def __init_state__(zile, intervale, sali):
         for idx_j, j in enumerate(intervale):
             sched[i][j] = {}
             for idx_k, k in enumerate(sali):
-                sched[i][j][k] = {}
+                sched[i][j][k] = ()
     return sched
 
-# initialisez the state machine let's call it
+# initialises the state machine let's call it
 states = []
 sched = __init_state__(zile, intervale, sali)
 states.append(sched)
@@ -49,10 +49,59 @@ def __print_state__(states, TIMETABLE):
     print(states[TIMETABLE])
     
 __print_state__(states, TIMETABLE)
+print()
+print("--------------------------------------------")
+print()
 
-# generates all possible actions from the lists of days, intervals, teachers 
+# initialize timetable with all possibilities, on its basis i generate the rest
+def __init_cobai__(zile, intervale, sali):
+    sched = {}
+    for idx_i, i in enumerate(zile):
+        sched[i] = {}
+        for idx_j, j in enumerate(intervale):
+            sched[i][j] = {}
+            for idx_k, k in enumerate(sali):
+                sched[i][j][k] = [] # instead of having a single tuple, we should have all 
+                # the possibilities of tech and subject so we can make generations
+    return sched
+
+cobai = __init_cobai__(zile, intervale, sali)
+
+# this genereates all the intervals in which a teacher can teach
+def __get_teach_poate__(zile, intervale, profi):
+    teach = {}
+    for i in profi:
+        ore_ok = []
+        zile_ok = []
+        teach[i] = {}
+        for j in profi[i]['Constrangeri']:
+            e_ora = 0
+            if '!' not in j:
+                for char in j:
+                    if char.isdigit():
+                        e_ora = 1
+                        break
+                if e_ora:
+                    start, end = map(int, j.split('-'))
+                    if (end - start) > 2:
+                        for ore in range (start, end, 2):
+                            endd = ore + 2
+                            interv = (start, endd)
+                            ore_ok.append(interv)
+                    else:
+                        ore_ok.append((start, end))
+                else:
+                    zile_ok.append(j)
+                teach[i]['ore_ok'] = ore_ok
+                teach[i]['zile_ok'] = zile_ok
+    return teach
+
+permisiuni = __get_teach_poate__(zile, intervale, profi)
+
+# I will have some random functions, with no utility, like this one, 
+# this generates all possible actions from the lists of days, intervals, teachers 
 # in order to satisfact the constraints of days and intervals for teachers
-def __generate_actions__(materii, profi, sali):
+def __generate_actions1__(materii, profi, sali):
     actions = []
     for i in profi:
         ore_ok = []
@@ -84,178 +133,81 @@ def __generate_actions__(materii, profi, sali):
                     zile_ok.append(j)
         for j in profi[i]['Materii']:
             materii_prof.append(j)
-        nume = None
-        nume = ''.join(char for char in i if char.isupper())
+        # nume = None
+        # nume = ''.join(char for char in i if char.isupper())
         for j in materii_prof:
             for k in ore_ok:
                 for l in zile_ok:
                     for m in sali:
                         if j in sali[m]['Materii']:
                             for n in materii:
-                                dummy = (l, k, j, m, nume)
+                                dummy = (l, k, j, m, i)
                                 actions.append(dummy)
     good_actions = sorted(list(set(actions)), key=lambda x: (x[0], x[1], x[2]))
     return good_actions
-                    
-actions = __generate_actions__(materii, profi, sali)
-print(actions)
+longer = __generate_actions1__(materii, profi, sali)
 
-# I will have some random functions, with no utility, like this one, 
-# which generates a timetable as a 2d array with columns as days, lines as intervals, 
-# and each cell as a 1d array with tuples as (subject, teacher, room)
-def __possible_arranjaments__(actions, WIDTH, HEIGHT):
-    possibilities = [[[] for _ in range(WIDTH)] for _ in range(HEIGHT)]
+# just teach and subject
+def __generate_actions2__(profi):
+    actions = []
+    for i in profi:
+        for j in profi[i]['Materii']:
+            dummy = (j, i)
+            actions.append(dummy)
+    return actions
+
+actions = __generate_actions2__(profi)
+
+def __populate_cobai__(cobai, actions):
     for i in actions:
-        col, lin = 0, 0
-        if i[0] == 'Luni':
-            col = 0
-        elif i[0] == 'Marti':
-            col = 1
-        elif i[0] == 'Miercuri':
-            col = 2
-        elif i[0] == 'Joi':
-            col = 3
-        else:
-            col = 4
-        if i[1] == '08-10':
-            lin = 0
-        elif i[1] == '10-12':
-            lin = 1
-        elif i[1] == '12-14':
-            lin = 2
-        elif i[1] == '14-16':
-            lin = 3
-        elif i[1] == '16-18':
-            lin = 4
-        else:
-            lin = 5
-        dummy = (i[2], i[4], i[3])
-        possibilities[lin][col].append(dummy)
-    return possibilities
+        start, end = map(int, i[1].split('-'))
+        intv = (start, end)
+        # oh darling, wrong keys
+        cobai[i[0]][str(intv)][i[3]].append((i[2], i[4]))
+        
+__populate_cobai__(cobai, longer)
 
-# gets the overlaps that occure when mixed all things as did in the previous function
-def __get_overlaps__(possibilities, sali):
+# gets the overlaps that occure in a dict
+def __get_overlaps__(cobai):
     overlaps = []
-    for index_i, i in enumerate(possibilities):
-        # ia pe zile
-        for index_j, j in enumerate(possibilities[index_i]):
-            for l in sali:
-                nr = 0
-                for k in j:
-                    if l in k:
-                        nr += 1
-                if nr >= 2:
-                    dummy = (l, index_j, index_i)
-                    overlaps.append(dummy)
-    return overlaps
+    nr = 0
+    for zi in cobai:
+        for ore in cobai[zi]:
+            for sala1 in cobai[zi][ore]:
+                for sala2 in cobai[zi][ore]:
+                    for tuplu1 in cobai[zi][ore][sala1]:
+                        for tuplu2 in cobai[zi][ore][sala2]:
+                            if tuplu1 != tuplu2 and tuplu1[1] == tuplu2[1]:
+                                overlaps.append((zi, ore, tuplu1[1]))
+                                nr += 1
+                    break
+    return nr, overlaps
+
+conflicts, overlaps = __get_overlaps__(cobai)
 
 # here the action is shorter
 # it searches according to the possibilities matrix from above 
 # where can an action (subject, teacher, room) can be placed
-def __where1__(action, possibilities):
+def __where__(action, sched, permisiuni):
     positions = []
-    for index_i, i in enumerate(possibilities):
-        for index_j, j in enumerate(possibilities[index_i]):
-            for k in j:
-                if action[0] == k[0] and action[1] == k[1] and action[2] == k[2]:
-                    dummy = (index_j, index_i)
-                    positions.append(dummy)
-    return positions
-
-# it does the same thing, but for a longer verion if the action
-def __where2__(action, sched):
-    positions = []
-    for day, intervals in sched.items():
-        for interval, info in intervals.items():
-            if action[0] == day and action[1] == interval and action[3] == info[0] and action[4] == info[1]:
-                positions.append((day, interval))
-    return positions
-
-# here is the whole version of the action
-# ('Luni', '08-10', 'DS', 'EG390', 'RG')
-# does the same thing as the function above, but now it checks on a dict
-def __where_in_table1__(action, sched):
-    positions = []
-    for index_i, i in enumerate(sched):
-        for index_j, j in enumerate(sched[i]):
-            for k in j:
-                if action[0] == index_i and action[1] == index_j and action[2] == k[0]:
-                    if sched[action[0]][action[1]] == None or sched[action[0]][action[1]].get(action[3], None) == None:
-                        dummy = (index_j, index_i)
-                        positions.append(dummy)
-    return positions
-
-# it does the same, but with a shorter version of action
-def __where_in_table2__(action, sched):
-    positions = []
-    for day, intervals in sched.items():
-        for interval, info in intervals.items():
-            if action[0] == day and action[1] == interval and action[3] == info[0] and action[4] == info[1]:
-                positions.append((day, interval))
-    return positions
-
-# generates a dict out of the matrix with all combinations
-def generate_schedule_dict(matrix, zile, intervale):
-    schedule_dict = {}
-    remain = [interval.copy() for interval in matrix]
-    for idx, day in enumerate(zile):
-        day_dict = {}
-        for interval_idx, interval in enumerate(intervale):
-            day_dict[interval] = {}
-            for tuplu in matrix[interval_idx][idx]:
-                day_dict[interval][tuplu[2]] = (tuplu[0], tuplu[1])
-                remain[interval_idx][idx].remove(tuplu)
-            if not remain[interval_idx][idx]:
-                remain[interval_idx].pop(idx)
-        schedule_dict[day] = day_dict
-    return schedule_dict, remain
-
-# it numbers the conflicts as the same teacher in two different rooms at same time
-# or the same teacher at two different subjects in the same room in the same time
-def __compute_conflicts__(sched):
-    conflicts = 0
+    pos = []
     for day in sched:
         for interval in sched[day]:
-            teachers = {}
-            for subject in sched[day][interval]:
-                teacher = sched[day][interval][subject][1]
-                if teacher in teachers:
-                    conflicts += 1
-                    break
-                else:
-                    teachers[teacher] = True
-    return conflicts
-
-# it generates timetables/dicts with as little conflicts as possible
-def __generate__(matrix, zile, intervale, sched, remains):
-    schedule_dict = sched
-    remain = []
-    for idx, day in enumerate(zile):
-        for interval_idx, interval in enumerate(intervale):
-            # Obținem o listă de indexuri randomizate pentru fiecare zi și interval
-            indices = list(range(len(matrix[interval_idx][idx])))
-            random.shuffle(indices)
-            for index in indices:
-                tuplu = matrix[interval_idx][idx][index]
-                for room in schedule_dict[day][interval]:
-                    if tuplu[2] == room and tuplu[0] == schedule_dict[day][interval][room][0] and tuplu[1] == schedule_dict[day][interval][room][1]:
-                        schedule_dict[day][interval].pop(room, None)
-                        if not schedule_dict[day][interval]:
-                            schedule_dict[day].pop(interval, None)
-                        break
-                else:
-                    remain.append(tuplu)
-    return schedule_dict, remain
-
-# it deletes the duplicates from the generated dicts from above
-def __good_ones__(sched, remains, possibilities):
-    good_ones = []
-    new_sched = sched.copy()
-    new_remain = remains.copy()
-    while __compute_conflicts__(new_sched) > 0:
-        new_sched, new_remain = __generate__(possibilities, zile, intervale, new_sched, new_remain)
-        good_ones.append(new_sched)
-    return good_ones
+            for room in sched[day][interval]:
+                for tuplu in sched[day][interval][room]:
+                    if action[1] in tuplu:
+                        positions.append((day, interval, room))
+    for posi in positions:
+        #oh, darling, wrong keys
+        ok = 0
+        for ceva in permisiuni[action[1]]['ore_ok']:
+            if str(ceva) == str(posi[1]):
+                ok += 1
+        if posi[0] in permisiuni[action[1]]['zile_ok']:
+            ok += 1
+        if ok == 2:
+            pos.append(posi)
+    return pos
 
 # to be to from the laboratory
 # Funcție ce întoarce starea în care se ajunge prin aplicarea unei acțiuni
