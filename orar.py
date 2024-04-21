@@ -48,10 +48,10 @@ states.append(sched)
 def __print_state__(states, TIMETABLE):
     print(states[TIMETABLE])
     
-__print_state__(states, TIMETABLE)
-print()
-print("--------------------------------------------")
-print()
+# __print_state__(states, TIMETABLE)
+# print()
+# print("--------------------------------------------")
+# print()
 
 # initialize timetable with all possibilities, on its basis i generate the rest
 def __init_cobai__(zile, intervale, sali):
@@ -185,17 +185,14 @@ def __get_overlaps__(cobai):
 
 conflicts, overlaps = __get_overlaps__(cobai)
 
-# here the action is shorter
-# it searches according to the possibilities matrix from above 
-# where can an action (subject, teacher, room) can be placed
-def __where__(action, sched, permisiuni):
+def __where__(action, sched, permisiuni, cobai):
     positions = []
     pos = []
     for day in sched:
-        for interval in sched[day]:
-            for room in sched[day][interval]:
-                for tuplu in sched[day][interval][room]:
-                    if action[1] in tuplu:
+        for interval in cobai[day]:
+            for room in cobai[day][interval]:
+                for tuplu in cobai[day][interval][room]:
+                    if action[1] in tuplu and sched[day][interval][room] == ():
                         positions.append((day, interval, room))
     for posi in positions:
         #oh, darling, wrong keys
