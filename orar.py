@@ -24,11 +24,6 @@ profi = data['Profesori']
 sali = data['Sali']
 zile = data['Zile']
 
-# taken from MCTS laboratory, decided to start with it, idk why
-# tried to adapt it to me
-HEIGHT, WIDTH = len(intervale), len(zile)
-TIMETABLE, NEXT_VERSION = 0, 1
-
 # initialize state
 def __init_state__(zile, intervale, sali):
     sched = {}
@@ -45,16 +40,6 @@ states = []
 sched = __init_state__(zile, intervale, sali)
 states.append(sched)
 
-# print initial state / the TIMETABLE cnt state
-def __print_state__(states, TIMETABLE):
-    print(states[TIMETABLE])
-
-# my pretty print but for testing purposes
-# __print_state__(states, TIMETABLE)
-# print()
-# print("--------------------------------------------")
-# print()
-
 # initialize timetable with all possibilities, on its basis i generate the rest
 def __init_cobai__(zile, intervale, sali):
     sched = {}
@@ -70,6 +55,8 @@ def __init_cobai__(zile, intervale, sali):
 cobai = __init_cobai__(zile, intervale, sali)
 
 # this genereates all the intervals in which a teacher can teach
+# tthis is soft constraint, we'll fix it later
+# first we have to deal with the hard/logistical ones
 def __get_teach_poate__(profi):
     teach = {}
     for i in profi:
@@ -86,9 +73,9 @@ def __get_teach_poate__(profi):
                 if e_ora:
                     start, end = map(int, j.split('-'))
                     if (end - start) > 2:
-                        for ore in range (start, end, 2):
+                        for ore in range(start, end-2, 2):
                             endd = ore + 2
-                            interv = (start, endd)
+                            interv = (ore, endd)
                             ore_ok.append(interv)
                     else:
                         ore_ok.append((start, end))
@@ -103,53 +90,30 @@ permisiuni = __get_teach_poate__(profi)
 # I will have some random functions, with no utility, like this one, 
 # this generates all possible actions from the lists of days, intervals, teachers 
 # in order to satisfact the constraints of days and intervals for teachers
-def __generate_actions1__(materii, profi, sali):
+def __generate_actions12__(profi, sali, zile, intervale):
     actions = []
     for i in profi:
-        ore_ok = []
-        zile_ok = []
         materii_prof = []
-        for j in profi[i]['Constrangeri']:
-            e_ora = 0
-            if '!' not in j:
-                for char in j:
-                    if char.isdigit():
-                        e_ora = 1
-                        break
-                if e_ora:
-                    start, end = map(int, j.split('-'))
-                    if start == 8:
-                        j='0'+j
-                    if (end - start) > 2:
-                        for ore in range (start, end, 2):
-                            endd = ore + 2
-                            if ore == 8:
-                                oree = '0'+str(ore)
-                            else:
-                                oree = str(ore)
-                            interv = oree + '-' + str(endd)
-                            ore_ok.append(interv)
-                    else:
-                        ore_ok.append(j)
-                else:
-                    zile_ok.append(j)
         for j in profi[i]['Materii']:
             materii_prof.append(j)
         # nume = None
         # nume = ''.join(char for char in i if char.isupper())
         for j in materii_prof:
-            for k in ore_ok:
-                for l in zile_ok:
+            for k in zile:
+                for l in intervale:
                     for m in sali:
-                        if j in sali[m]['Materii']:
-                            for n in materii:
-                                dummy = (l, k, j, m, i)
-                                actions.append(dummy)
+                        if str(j) in sali[m]['Materii']:
+                            dummy = (k, l, j, m, i)
+                            actions.append(dummy)
     good_actions = sorted(list(set(actions)), key=lambda x: (x[0], x[1], x[2]))
     return good_actions
-longer = __generate_actions1__(materii, profi, sali)
+longer2 = __generate_actions12__(profi, sali, zile, intervale)
+# print(longer2)
+# print()
+# print("--------------------------------------------")
+# print()
 
-# just teach and subject
+# just teach and subject, no constraints =)
 def __generate_actions2__(profi):
     actions = []
     for i in profi:
@@ -159,16 +123,35 @@ def __generate_actions2__(profi):
     return actions
 
 actions = __generate_actions2__(profi)
+# print(actions)
+# print()
+# print("--------------------------------------------")
+# print()
 
-def __populate_cobai__(cobai, actions):
+def __populate_cobai2__(cobai, actions):
     for i in actions:
-        start, end = map(int, i[1].split('-'))
-        intv = (start, end)
-        # oh darling, wrong keys
-        cobai[i[0]][str(intv)][i[3]].append((i[2], i[4]))
+        cobai[i[0]][i[1]][i[3]].append((i[4], i[2]))
         
-__populate_cobai__(cobai, longer)
+__populate_cobai2__(cobai, longer2)
+# print(cobai)
+# print()
+# print("--------------------------------------------")
+# print()
 
+def __get__conflicts__(sched):
+    nr = 0
+    for zi in sched:
+        for ore in sched[zi]:
+            for sala in sched[zi][ore]:
+                # sched[zi][ore][sala][0] asta e prof
+                # permisiuni[sched[zi][ore][sala][0]]
+                if zi in permisiuni[sched[zi][ore][sala][0]]['zile_ok']:
+                    for tupl in permisiuni[sched[zi][ore][sala][0]]['ore_ok']:
+                        if str(tupl) != ore:
+                            nr += 1
+    return nr
+
+# this is on a schedule, not a cobai, and is about the rooms
 def __other_conflicts__(board):
     nr = 0
     vector_caracteristic = {}
@@ -178,12 +161,13 @@ def __other_conflicts__(board):
         for ore in board[zi]:
             for sala in board[zi][ore]:
                 if len(board[zi][ore][sala]) >= 1:
-                    vector_caracteristic[board[zi][ore][sala][0]] += sali[sala]['Capacitate']
+                    vector_caracteristic[board[zi][ore][sala][1]] += sali[sala]['Capacitate']
     for i in vector_caracteristic:
         if vector_caracteristic[i] < materii[i]:
             nr += 1
     return nr
 
+# this is on a schedule, not a cobai, and is about the overlaps
 def __compute_conflicts__(board):
     nr = 0
     for zi in board:
@@ -191,54 +175,68 @@ def __compute_conflicts__(board):
             for sala1 in board[zi][ore]:
                 for sala2 in board[zi][ore]:
                     if sala1 != sala2:
-                        if len(board[zi][ore][sala1]) >= 1 and len(board[zi][ore][sala2]) >= 1 and board[zi][ore][sala1][1] == board[zi][ore][sala2][1]:
+                        if len(board[zi][ore][sala1]) >= 1 and len(board[zi][ore][sala2]) >= 1 and board[zi][ore][sala1][0] == board[zi][ore][sala2][0]:
                             nr += 1
                 break
     num = __other_conflicts__(board)
+    # nrr = __get__conflicts__(board)
     nr += num
+    # nr += nrr
     return nr
 
-def __where__(action, sched, permisiuni, cobai):
+def __where2__(actionn, sched, cobai):
     positions = []
-    pos = []
     for day in sched:
         for interval in cobai[day]:
             for room in cobai[day][interval]:
                 for tuplu in cobai[day][interval][room]:
-                    if action[1] in tuplu and sched[day][interval][room] == ():
+                    if len(actionn) >= 4 and actionn[2] == tuplu[1] and actionn[4] == tuplu[0] and sched[day][interval][room] == ():
                         positions.append((day, interval, room))
-    for posi in positions:
-        #oh, darling, wrong keys
-        ok = 0
-        for ceva in permisiuni[action[1]]['ore_ok']:
-            if str(ceva) == str(posi[1]):
-                ok += 1
-        if posi[0] in permisiuni[action[1]]['zile_ok']:
-            ok += 1
-        if ok == 2:
-            pos.append(posi)
-    return pos
+    return positions
+# pos = __where2__(longer2[0], sched, cobai)
+# print(pos)
+# print()
+# print("--------------------------------------------")
+# print()
 
-def __all_actions__(actions, permisiuni):
+def __where21__(action, sched, cobai):
+    positions = []
+    for day in sched:
+        for interval in cobai[day]:
+            for room in cobai[day][interval]:
+                for tuplu in cobai[day][interval][room]:
+                    if len(action) >= 2 and action[0] == tuplu[1] and action[1] == tuplu[0] and sched[day][interval][room] == ():
+                        positions.append((day, interval, room))
+    return positions
+
+def __all_actions2__(actions):
     evryting = []
     everything = []
     for materie, cineva in actions:
-        nr = len(permisiuni[cineva]['zile_ok']) * len(permisiuni[cineva]['ore_ok'])
+        nr = len(zile) * len(intervale)
         for _ in range(nr):
             evryting.append((materie, cineva))
     return evryting
 
-all_actions = __all_actions__(actions, permisiuni)
+all_actions = __all_actions2__(actions)
+# print(all_actions)
+# print()
+# print("--------------------------------------------")
+# print()
 
-def __get_all_possible_places__(all_actions, permisiuni, cobai, sched):
+def __get_all_possible_places2__(all_actions, cobai, sched):
     idk = {}
     for act in all_actions:
         idk[act] = []
-        dummy = __where__(act, sched, permisiuni, cobai)
+        dummy = __where21__(act, sched, cobai)
         idk[act] = dummy
     return idk
 
-evriuere = __get_all_possible_places__(all_actions, permisiuni, cobai, sched)
+evriuere = __get_all_possible_places2__(all_actions, cobai, sched)
+# print(evriuere)
+# print()
+# print("--------------------------------------------")
+# print()
 
 def __rand_shuffle_gen__(sched, cobai):
     orar_nou = deepcopy(sched)
@@ -254,24 +252,35 @@ def __rand_shuffle_gen__(sched, cobai):
                             orar_nou[zi][interval][sala] = cobai[zi][interval][sala].pop(0)
     return orar_nou
 
+# orar_nou = __rand_shuffle_gen__(sched, cobai)
+# print(orar_nou)
+# print()
+# print("--------------------------------------------")
+# print()
+
 def __let_s_see__(sched, cobai):
     idk = None
     nr = 2
-    while nr != 1:
+    while nr != 0:
         orar_nou = __rand_shuffle_gen__(sched, cobai)
         nr = __compute_conflicts__(orar_nou)
-        if nr == 1:
+        if nr == 0:
             idk = orar_nou
     return idk
 
-def __hai_ca_da__(sched, cobai):
-    idk = []
-    for _ in range(100):
-        hbrnm = __let_s_see__(sched, cobai)
-        print(hbrnm)
-        idk.append(hbrnm)
-    return idk
+idkk = __let_s_see__(sched, cobai)
+print(idkk)
+print()
+print("--------------------------------------------")
+print()
 
-nuj_fra = __hai_ca_da__(sched, cobai)
-print(nuj_fra)
-        
+# def __hai_ca_da__(sched, cobai):
+#     idk = []
+#     for _ in range(100):
+#         hbrnm = __let_s_see__(sched, cobai)
+#         print(hbrnm)
+#         idk.append(hbrnm)
+#     return idk
+                
+# nuj_fra = __hai_ca_da__(sched, cobai)
+# print(nuj_fra)
