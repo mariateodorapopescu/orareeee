@@ -169,23 +169,34 @@ def __populate_cobai__(cobai, actions):
         
 __populate_cobai__(cobai, longer)
 
-# gets the overlaps that occure in a dict
-def __get_overlaps__(cobai):
-    overlaps = []
+def __other_conflicts__(board):
     nr = 0
-    for zi in cobai:
-        for ore in cobai[zi]:
-            for sala1 in cobai[zi][ore]:
-                for sala2 in cobai[zi][ore]:
-                    for tuplu1 in cobai[zi][ore][sala1]:
-                        for tuplu2 in cobai[zi][ore][sala2]:
-                            if tuplu1 != tuplu2 and tuplu1[1] == tuplu2[1]:
-                                overlaps.append((zi, ore, tuplu1[1]))
-                                nr += 1
-                    break
-    return nr, overlaps
+    vector_caracteristic = {}
+    for i in materii:
+        vector_caracteristic[i] = 0
+    for zi in board:
+        for ore in board[zi]:
+            for sala in board[zi][ore]:
+                if len(board[zi][ore][sala]) >= 1:
+                    vector_caracteristic[board[zi][ore][sala][0]] += sali[sala]['Capacitate']
+    for i in vector_caracteristic:
+        if vector_caracteristic[i] < materii[i]:
+            nr += 1
+    return nr
 
-conflicts, overlaps = __get_overlaps__(cobai)
+def __compute_conflicts__(board):
+    nr = 0
+    for zi in board:
+        for ore in board[zi]:
+            for sala1 in board[zi][ore]:
+                for sala2 in board[zi][ore]:
+                    if sala1 != sala2:
+                        if len(board[zi][ore][sala1]) >= 1 and len(board[zi][ore][sala2]) >= 1 and board[zi][ore][sala1][1] == board[zi][ore][sala2][1]:
+                            nr += 1
+                break
+    num = __other_conflicts__(board)
+    nr += num
+    return nr
 
 def __where__(action, sched, permisiuni, cobai):
     positions = []
@@ -242,3 +253,25 @@ def __rand_shuffle_gen__(sched, cobai):
                             shuffle(cobai[zi][interval][sala])
                             orar_nou[zi][interval][sala] = cobai[zi][interval][sala].pop(0)
     return orar_nou
+
+def __let_s_see__(sched, cobai):
+    idk = None
+    nr = 2
+    while nr != 1:
+        orar_nou = __rand_shuffle_gen__(sched, cobai)
+        nr = __compute_conflicts__(orar_nou)
+        if nr == 1:
+            idk = orar_nou
+    return idk
+
+def __hai_ca_da__(sched, cobai):
+    idk = []
+    for _ in range(100):
+        hbrnm = __let_s_see__(sched, cobai)
+        print(hbrnm)
+        idk.append(hbrnm)
+    return idk
+
+nuj_fra = __hai_ca_da__(sched, cobai)
+print(nuj_fra)
+        
