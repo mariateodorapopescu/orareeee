@@ -5,10 +5,11 @@ from copy import copy
 from copy import deepcopy
 from functools import reduce
 import numpy as np
-import random
+import utils
+from random import shuffle, seed, randint
 # imports
 
-# reader
+# reader, beacuse I have not seen utils.py until a certian moment
 data = None
 with open("dummy.yaml") as stream:
     try:
@@ -47,7 +48,8 @@ states.append(sched)
 # print initial state / the TIMETABLE cnt state
 def __print_state__(states, TIMETABLE):
     print(states[TIMETABLE])
-    
+
+# my pretty print but for testing purposes
 # __print_state__(states, TIMETABLE)
 # print()
 # print("--------------------------------------------")
@@ -68,7 +70,7 @@ def __init_cobai__(zile, intervale, sali):
 cobai = __init_cobai__(zile, intervale, sali)
 
 # this genereates all the intervals in which a teacher can teach
-def __get_teach_poate__(zile, intervale, profi):
+def __get_teach_poate__(profi):
     teach = {}
     for i in profi:
         ore_ok = []
@@ -96,7 +98,7 @@ def __get_teach_poate__(zile, intervale, profi):
                 teach[i]['zile_ok'] = zile_ok
     return teach
 
-permisiuni = __get_teach_poate__(zile, intervale, profi)
+permisiuni = __get_teach_poate__(profi)
 
 # I will have some random functions, with no utility, like this one, 
 # this generates all possible actions from the lists of days, intervals, teachers 
@@ -166,7 +168,6 @@ def __populate_cobai__(cobai, actions):
         cobai[i[0]][str(intv)][i[3]].append((i[2], i[4]))
         
 __populate_cobai__(cobai, longer)
-print(cobai)
 
 # gets the overlaps that occure in a dict
 def __get_overlaps__(cobai):
@@ -227,3 +228,17 @@ def __get_all_possible_places__(all_actions, permisiuni, cobai, sched):
     return idk
 
 evriuere = __get_all_possible_places__(all_actions, permisiuni, cobai, sched)
+
+def __rand_shuffle_gen__(sched, cobai):
+    orar_nou = deepcopy(sched)
+    for zi in orar_nou:
+        for interval in orar_nou[zi]:
+            for sala in orar_nou[zi][interval]:
+                if orar_nou[zi][interval][sala] == ():
+                    if cobai[zi][interval][sala] != []:
+                        if randint(0, 1) == 0:
+                            orar_nou[zi][interval][sala] = cobai[zi][interval][sala][randint(0, len(cobai[zi][interval][sala]) - 1)]
+                        else:
+                            shuffle(cobai[zi][interval][sala])
+                            orar_nou[zi][interval][sala] = cobai[zi][interval][sala].pop(0)
+    return orar_nou
