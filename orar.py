@@ -25,6 +25,11 @@ sali = data['Sali']
 zile = data['Zile']
 intervale = [eval(i) for i in intervale1]
 
+# my pretty print
+# print()
+# print("--------------------------------------------")
+# print()
+
 # initialize state
 def __init_state__(zile, intervale, sali):
     sched = {}
@@ -109,10 +114,6 @@ def __generate_actions12__(profi, sali, zile, intervale):
     good_actions = sorted(list(set(actions)), key=lambda x: (x[0], x[1], x[2]))
     return good_actions
 longer2 = __generate_actions12__(profi, sali, zile, intervale)
-# print(longer2)
-# print()
-# print("--------------------------------------------")
-# print()
 
 # just teach and subject, no constraints =)
 def __generate_actions2__(profi):
@@ -124,20 +125,12 @@ def __generate_actions2__(profi):
     return actions
 
 actions = __generate_actions2__(profi)
-# print(actions)
-# print()
-# print("--------------------------------------------")
-# print()
 
 def __populate_cobai2__(cobai, actions):
     for i in actions:
         cobai[i[0]][i[1]][i[3]].append((i[4], i[2]))
         
 __populate_cobai2__(cobai, longer2)
-# print(cobai)
-# print()
-# print("--------------------------------------------")
-# print()
 
 def __get__conflicts__(sched):
     nr = 0
@@ -194,11 +187,6 @@ def __where2__(actionn, sched, cobai):
                     if len(actionn) >= 4 and actionn[2] == tuplu[1] and actionn[4] == tuplu[0] and sched[day][interval][room] == ():
                         positions.append((day, interval, room))
     return positions
-# pos = __where2__(longer2[0], sched, cobai)
-# print(pos)
-# print()
-# print("--------------------------------------------")
-# print()
 
 def __where21__(action, sched, cobai):
     positions = []
@@ -220,10 +208,6 @@ def __all_actions2__(actions):
     return evryting
 
 all_actions = __all_actions2__(actions)
-# print(all_actions)
-# print()
-# print("--------------------------------------------")
-# print()
 
 def __get_all_possible_places2__(all_actions, cobai, sched):
     idk = {}
@@ -234,10 +218,6 @@ def __get_all_possible_places2__(all_actions, cobai, sched):
     return idk
 
 evriuere = __get_all_possible_places2__(all_actions, cobai, sched)
-# print(evriuere)
-# print()
-# print("--------------------------------------------")
-# print()
 
 def __rand_shuffle_gen__(sched, cobai):
     orar_nou = deepcopy(sched)
@@ -254,10 +234,6 @@ def __rand_shuffle_gen__(sched, cobai):
     return orar_nou
 
 # orar_nou = __rand_shuffle_gen__(sched, cobai)
-# print(orar_nou)
-# print()
-# print("--------------------------------------------")
-# print()
 
 def __let_s_see__(sched, cobai):
     idk = None
@@ -271,9 +247,7 @@ def __let_s_see__(sched, cobai):
 
 # idkk = __let_s_see__(sched, cobai)
 # print(idkk)
-# print()
-# print("--------------------------------------------")
-# print()
+
 # filename = f'inputs/orar_mic_exact.yaml'
 filename = f'dummy.yaml'
 # print(pretty_print_timetable(idkk, filename))
