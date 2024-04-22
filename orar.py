@@ -5,11 +5,11 @@ from copy import copy
 from copy import deepcopy
 from functools import reduce
 import numpy as np
-import utils
+from utils import pretty_print_timetable
 from random import shuffle, seed, randint
 # imports
 
-# reader, beacuse I have not seen utils.py until a certian moment
+# reader, beacuse I have not seen utils.py until a certian moment, shame on me
 data = None
 with open("dummy.yaml") as stream:
     try:
@@ -19,10 +19,11 @@ with open("dummy.yaml") as stream:
         
 #parser
 materii = data['Materii']
-intervale = data['Intervale']
+intervale1 = data['Intervale']
 profi = data['Profesori']
 sali = data['Sali']
 zile = data['Zile']
+intervale = [eval(i) for i in intervale1]
 
 # initialize state
 def __init_state__(zile, intervale, sali):
@@ -268,11 +269,14 @@ def __let_s_see__(sched, cobai):
             idk = orar_nou
     return idk
 
-idkk = __let_s_see__(sched, cobai)
-print(idkk)
-print()
-print("--------------------------------------------")
-print()
+# idkk = __let_s_see__(sched, cobai)
+# print(idkk)
+# print()
+# print("--------------------------------------------")
+# print()
+# filename = f'inputs/orar_mic_exact.yaml'
+filename = f'dummy.yaml'
+# print(pretty_print_timetable(idkk, filename))
 
 # def __hai_ca_da__(sched, cobai):
 #     idk = []
