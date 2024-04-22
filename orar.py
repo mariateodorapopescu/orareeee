@@ -7,6 +7,8 @@ from functools import reduce
 import numpy as np
 from utils import pretty_print_timetable
 from random import shuffle, seed, randint
+import random
+filename = f'dummy.yaml'
 # imports
 
 # reader, beacuse I have not seen utils.py until a certian moment, shame on me
@@ -54,6 +56,7 @@ states = []
 
 # we will foreever have an empty timetable
 vesnic_gol = __init_state__(zile, intervale, sali)
+test = __init_state__(zile, intervale, sali)
 
 def __init_cobai__(zile, intervale, sali):
     '''
@@ -126,11 +129,12 @@ def __generate_actions12__(profi, sali, zile, intervale):
                 for l in intervale:
                     for m in sali:
                         if str(j) in sali[m]['Materii']:
-                            dummy = (k, l, j, m, i)
+                            dummy = (k, l, m, i, j)
                             actions.append(dummy)
     good_actions = sorted(list(set(actions)), key=lambda x: (x[0], x[1], x[2]))
     return good_actions
 longer2 = __generate_actions12__(profi, sali, zile, intervale)
+# __my_pretty_print__(longer2)
 
 def __generate_actions2__(profi):
     '''
@@ -141,11 +145,12 @@ def __generate_actions2__(profi):
     actions = []
     for i in profi:
         for j in profi[i]['Materii']:
-            dummy = (j, i)
+            dummy = (i, j)
             actions.append(dummy)
     return actions
 
 actions = __generate_actions2__(profi)
+# __my_pretty_print__(actions)
 
 def __populate_cobai2__(cobai, actions):
     '''
@@ -154,10 +159,11 @@ def __populate_cobai2__(cobai, actions):
     On its basis we satisfact/choose what to put in the right timetable
     '''
     for i in actions:
-        cobai[i[0]][i[1]][i[3]].append((i[4], i[2]))
+        cobai[i[0]][i[1]][i[2]].append((i[3], i[4]))
         
 # we populate the timetable with all arrangements
 __populate_cobai2__(cobai, longer2)
+# __my_pretty_print__(cobai)
 
 def __get__pref_conflicts__(sched):
     '''
@@ -193,6 +199,20 @@ def __get_capacity_conflicts__(board):
             nr += 1
     return nr
 
+def __get_teach_table__(board, teacher, zile, intervale, sali):
+    '''
+    Trying to achieve the bonus bullet, but it's just a thought...
+    Makes a timetable for each teacher in order to see the breaks
+    '''
+    table = {}
+    table = __init_state__(zile, intervale, sali)
+    for zi in board:
+        for ore in board[zi]:
+            for sala in board[zi][ore]:
+                if teacher in board[zi][ore][sala]:
+                    table[zi][ore][sala] = board[zi][ore][sala]
+    return table
+
 def __get_overlap_conflicts__(board):
     '''
     Checks to see if a teacher is NOT in two different places in the same time
@@ -209,6 +229,53 @@ def __get_overlap_conflicts__(board):
                 break
     return nr
 
+def __get_overh_conflicts__(board, profi):
+    '''
+    Returns the number of teachers that have more than 7 intervals 
+    -> it is a constraint, actually, so returns the number of 
+    this type of conflicts
+    '''
+    nr = 0
+    teach = {}
+    for t in profi:
+        teach[t] = 0
+    for zi in board:
+        for ore in board[zi]:
+            for sali in board[zi][ore]:
+                if len(board[zi][ore][sali]) >= 1:
+                    teach[board[zi][ore][sali][0]] += 1
+    for t in teach:
+        if teach[t] > 7:
+            nr += 1
+    return nr
+
+def __get_hconflicts__(board, profi):
+    '''
+    Get number of hard conflicts
+    '''
+    nr = 0
+    nr += __get_capacity_conflicts__(board)
+    nr += __get_overlap_conflicts__(board)
+    nr += __get_overh_conflicts__(board, profi)
+    return nr
+
+def __get_sconflicts__(board):
+    '''
+    Get number of soft conflicts
+    '''
+    nr = 0
+    nr += __get__pref_conflicts__(board)
+    return nr
+
+def __get_all_conflicts__(board, profi):
+    '''
+    Get number of all types of conflicts
+    '''
+    nr = 0
+    nr += __get_hconflicts__(board, profi)
+    nr += __get_sconflicts__(board)
+    return nr
+
 def __where2__(actionn, sched, cobai):
     '''
     On a longer form of a "card"/possibile arrangement 
@@ -221,9 +288,10 @@ def __where2__(actionn, sched, cobai):
         for interval in cobai[day]:
             for room in cobai[day][interval]:
                 for tuplu in cobai[day][interval][room]:
-                    if len(actionn) >= 4 and actionn[2] == tuplu[1] and actionn[4] == tuplu[0] and sched[day][interval][room] == ():
+                    if len(actionn) >= 4 and actionn[4] == tuplu[1] and actionn[3] == tuplu[0] and sched[day][interval][room] == ():
                         positions.append((day, interval, room))
     return positions
+# __my_pretty_print__(__where2__(longer2[0],test,cobai))
 
 def __where21__(action, sched, cobai):
     '''
@@ -237,9 +305,10 @@ def __where21__(action, sched, cobai):
         for interval in cobai[day]:
             for room in cobai[day][interval]:
                 for tuplu in cobai[day][interval][room]:
-                    if len(action) >= 2 and action[0] == tuplu[1] and action[1] == tuplu[0] and sched[day][interval][room] == ():
+                    if len(action) >= 2 and action[0] == tuplu[0] and action[1] == tuplu[1] and sched[day][interval][room] == ():
                         positions.append((day, interval, room))
     return positions
+# __my_pretty_print__(__where21__(actions[0],test,cobai))
 
 def __all_actions2__(actions):
     '''
@@ -259,12 +328,12 @@ def __all_actions2__(actions):
 
 # it stores as many cards as many days and intervals for every teacher
 all_actions = __all_actions2__(actions)
+# __my_pretty_print__(all_actions)
 
 def __get_all_possible_places2__(all_actions, cobai, sched):
     '''
-    Generate all possible "moves"/places to put all the "cards"
-    Quite uninspired as it should have been a dictionary ;_;
-    (only now do I see it) 
+    Generate all possible "moves"/places to put 
+    all the "cards" (teacher, course)
     '''
     idk = {}
     for act in all_actions:
@@ -276,6 +345,33 @@ def __get_all_possible_places2__(all_actions, cobai, sched):
 # it stores all the possible places for (teacher, subject) card, 
 # where can be put in timetable
 evriuere = __get_all_possible_places2__(all_actions, cobai, vesnic_gol)
+# __my_pretty_print__(evriuere)
+
+def __make_move__(sched, profi, cobai):
+    places = []
+    acts = __generate_actions2__(profi)
+    all_acts = __all_actions2__(acts)
+    index1 = randint(0, len(all_acts)-1)
+    an_action = all_acts[index1]
+    places = __where21__(an_action, sched, cobai)
+    while places != []:
+        index1 = randint(0, len(all_acts)-1)
+        an_action = all_acts[index1]
+        places = __where21__(an_action, sched, cobai)
+    index2 = randint(0, len(places)-1)
+    a_place = places[index2]
+    sched[a_place[0]][a_place[1]][a_place[2]] = an_action
+
+def __generate1__(sched, profi, cobai):
+    while __get_capacity_conflicts__(sched) > 0:
+        __make_move__(sched,profi,cobai)
+        
+def __generate2__(sched, profi, cobai):
+    while __get_capacity_conflicts__(sched) + __get_overlap_conflicts__(sched) > 0:
+        __make_move__(sched,profi,cobai)
+
+__generate1__(test,profi,cobai)
+# print(pretty_print_timetable(test, filename))
 
 def __rand_shuffle_gen1__(sched, cobai):
     '''
@@ -297,7 +393,8 @@ def __rand_shuffle_gen1__(sched, cobai):
                             orar_nou[zi][interval][sala] = cobai[zi][interval][sala].pop(0)
     return orar_nou
 
-# orar_nou = __rand_shuffle_gen__(sched, cobai)
+orar_nou = __rand_shuffle_gen1__(vesnic_gol, cobai)
+print(pretty_print_timetable(orar_nou, filename))
 
 def __let_s_see__(sched, cobai):
     '''
@@ -314,25 +411,20 @@ def __let_s_see__(sched, cobai):
     return idk
 
 # for the time I tried to generate a good timetable
-# idkk = __let_s_see__(sched, cobai)
-# print(idkk)
-
-# for the time I descovered pretty_printing thing in utils.py and tested it
-# filename = f'inputs/orar_mic_exact.yaml'
-filename = f'dummy.yaml'
+idkk = __let_s_see__(vesnic_gol, cobai)
 # print(pretty_print_timetable(idkk, filename))
 
-# def __hai_ca_da__(sched, cobai):
-    # '''
-    # This one is an unhappy try of mine for generating reliable timetables,
-    # until I moved to the algorithms
-    # '''
-#     idk = []
-#     for _ in range(100):
-#         hbrnm = __let_s_see__(sched, cobai)
-#         print(hbrnm)
-#         idk.append(hbrnm)
-#     return idk
+def __hai_ca_da__(sched, cobai):
+    '''
+    This one is an unhappy try of mine for generating reliable timetables,
+    until I moved to the algorithms
+    '''
+    idk = []
+    for _ in range(100):
+        hbrnm = __let_s_see__(sched, cobai)
+        print(hbrnm)
+        idk.append(hbrnm)
+    return idk
                 
-# nuj_fra = __hai_ca_da__(sched, cobai)
+nuj_fra = __hai_ca_da__(vesnic_gol, cobai)
 # print(nuj_fra)
