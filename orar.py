@@ -8,25 +8,9 @@ import numpy as np
 from utils import pretty_print_timetable
 from random import shuffle, seed, randint
 import random
-filename = f'dummy.yaml'
 # imports
-
-# reader, beacuse I have not seen utils.py until a certian moment, shame on me
-data = None
-with open("dummy.yaml") as stream:
-    try:
-        data = yaml.safe_load(stream)
-    except yaml.YAMLError as exc:
-        print(exc)
-        
-#parser
-materii = data['Materii']
-intervale1 = data['Intervale']
-profi = data['Profesori']
-sali = data['Sali']
-zile = data['Zile']
-intervale = [eval(i) for i in intervale1]
-
+# --------------------------------------------------------------------------------------
+# formatting
 def __my_pretty_print__(Any):
     '''
     My pretty print for testing purposes
@@ -35,7 +19,8 @@ def __my_pretty_print__(Any):
     print(Any)
     print()
     print("--------------------------------------------")
-
+# --------------------------------------------------------------------------------------
+# initialize things, make the background, let's say
 def __init_state__(zile, intervale, sali):
     '''
     Initialize state
@@ -50,13 +35,6 @@ def __init_state__(zile, intervale, sali):
             for idx_k, k in enumerate(sali):
                 sched[i][j][k] = ()
     return sched
-
-# initialises the state machine let's call it
-states = []
-
-# we will foreever have an empty timetable
-vesnic_gol = __init_state__(zile, intervale, sali)
-test = __init_state__(zile, intervale, sali)
 
 def __init_cobai__(zile, intervale, sali):
     '''
@@ -73,9 +51,8 @@ def __init_cobai__(zile, intervale, sali):
                 sched[i][j][k] = [] # instead of having a single tuple, we should have all 
                 # the possibilities of tech and subject so we can make generations
     return sched
-
-cobai = __init_cobai__(zile, intervale, sali)
-
+# --------------------------------------------------------------------------------------
+# getters
 def __get_teach_poate__(profi):
     '''
     Genereates all the intervals in which a teacher can teach \n
@@ -110,8 +87,21 @@ def __get_teach_poate__(profi):
                 teach[i]['zile_ok'] = zile_ok
     return teach
 
-permisiuni = __get_teach_poate__(profi)
-
+def __get_teach_table__(board, teacher, zile, intervale, sali):
+    '''
+    Trying to achieve the bonus bullet, but it's just a thought...
+    Makes a timetable for each teacher in order to see the breaks
+    '''
+    table = {}
+    table = __init_state__(zile, intervale, sali)
+    for zi in board:
+        for ore in board[zi]:
+            for sala in board[zi][ore]:
+                if teacher in board[zi][ore][sala]:
+                    table[zi][ore][sala] = board[zi][ore][sala]
+    return table
+# --------------------------------------------------------------------------------------
+# generators of parts for timetable generator
 def __generate_actions12__(profi, sali, zile, intervale):
     ''' 
     Generates all possible actions from the lists of days, intervals, teachers
@@ -133,8 +123,6 @@ def __generate_actions12__(profi, sali, zile, intervale):
                             actions.append(dummy)
     good_actions = sorted(list(set(actions)), key=lambda x: (x[0], x[1], x[2]))
     return good_actions
-longer2 = __generate_actions12__(profi, sali, zile, intervale)
-# __my_pretty_print__(longer2)
 
 def __generate_actions2__(profi):
     '''
@@ -149,23 +137,68 @@ def __generate_actions2__(profi):
             actions.append(dummy)
     return actions
 
-actions = __generate_actions2__(profi)
-# __my_pretty_print__(actions)
-
-def __populate_cobai2__(cobai, actions):
+def __where2__(actionn, sched, cobai):
     '''
-    Here is generated a whole timetable, but with all constraints not satisfied \n
-    Basically, is a timetable with all possible arrangements/with all possibilities \n
-    On its basis we satisfact/choose what to put in the right timetable
+    On a longer form of a "card"/possibile arrangement 
+    (day, interval, room, teacher, subject) tuple show where to put it in the timetable,
+    according to the timetable with all the possibilities 
+    and the empty slots in the timetable right now.
     '''
-    for i in actions:
-        cobai[i[0]][i[1]][i[2]].append((i[3], i[4]))
-        
-# we populate the timetable with all arrangements
-__populate_cobai2__(cobai, longer2)
-# __my_pretty_print__(cobai)
+    positions = []
+    for day in sched:
+        for interval in cobai[day]:
+            for room in cobai[day][interval]:
+                for tuplu in cobai[day][interval][room]:
+                    if len(actionn) >= 4 and actionn[4] == tuplu[1] and actionn[3] == tuplu[0] and sched[day][interval][room] == ():
+                        positions.append((day, interval, room))
+    return positions
 
-def __get__pref_conflicts__(sched):
+def __where21__(action, sched, cobai):
+    '''
+    On a shorter form of a "card"/possibile arrangement 
+    (teacher, subject) tuple show where to put it in the timetable,
+    according to the timetable with all the possibilities 
+    and the empty slots in the timetable right now.
+    '''
+    positions = []
+    for day in sched:
+        for interval in cobai[day]:
+            for room in cobai[day][interval]:
+                for tuplu in cobai[day][interval][room]:
+                    if len(action) >= 2 and action[0] == tuplu[0] and action[1] == tuplu[1] and sched[day][interval][room] == ():
+                        positions.append((day, interval, room))
+    return positions
+
+def __all_actions2__(actions):
+    '''
+    Now, generating for each teacher and their subject (teacher, subject) "card" 
+    all possible days and intervals without satisfying the prefferances 
+    with days and intervals just to be sure to fullfill the rooms and timetable.
+    Of course, some teachers may have more then 7 intervals, 
+    but this restriction will be fullfilled in a separate function.
+    '''
+    evryting = []
+    everything = []
+    for materie, cineva in actions:
+        nr = len(zile) * len(intervale)
+        for _ in range(nr):
+            evryting.append((materie, cineva))
+    return evryting
+
+def __get_all_possible_places2__(all_actions, cobai, sched):
+    '''
+    Generate all possible "moves"/places to put 
+    all the "cards" (teacher, course)
+    '''
+    idk = {}
+    for act in all_actions:
+        idk[act] = []
+        dummy = __where21__(act, sched, cobai)
+        idk[act] = dummy
+    return idk
+# --------------------------------------------------------------------------------------
+# conflicts
+def __get__pref_conflicts__(sched, permisiuni):
     '''
     Checks soft permissions without the !Pauza constraint
     Bullets 1, 2, 3 from soft constraints
@@ -174,7 +207,7 @@ def __get__pref_conflicts__(sched):
     for zi in sched:
         for ore in sched[zi]:
             for sala in sched[zi][ore]:
-                if zi in permisiuni[sched[zi][ore][sala][0]]['zile_ok']:
+                if len(sched[zi][ore][sala]) >= 1 and zi in permisiuni[sched[zi][ore][sala][0]]['zile_ok']:
                     for tupl in permisiuni[sched[zi][ore][sala][0]]['ore_ok']:
                         if str(tupl) != ore:
                             nr += 1
@@ -198,20 +231,6 @@ def __get_capacity_conflicts__(board):
         if vector_caracteristic[i] < materii[i]:
             nr += 1
     return nr
-
-def __get_teach_table__(board, teacher, zile, intervale, sali):
-    '''
-    Trying to achieve the bonus bullet, but it's just a thought...
-    Makes a timetable for each teacher in order to see the breaks
-    '''
-    table = {}
-    table = __init_state__(zile, intervale, sali)
-    for zi in board:
-        for ore in board[zi]:
-            for sala in board[zi][ore]:
-                if teacher in board[zi][ore][sala]:
-                    table[zi][ore][sala] = board[zi][ore][sala]
-    return table
 
 def __get_overlap_conflicts__(board):
     '''
@@ -254,124 +273,81 @@ def __get_hconflicts__(board, profi):
     Get number of hard conflicts
     '''
     nr = 0
-    nr += __get_capacity_conflicts__(board)
-    nr += __get_overlap_conflicts__(board)
-    nr += __get_overh_conflicts__(board, profi)
-    return nr
+    i = __get_capacity_conflicts__(board)
+    j, conflicts1 = __get_overlap_conflicts__(board)
+    k = __get_overh_conflicts__(board, profi)
+    nr += i
+    nr += j
+    nr += k
+    return nr, conflicts1
 
 def __get_sconflicts__(board):
     '''
     Get number of soft conflicts
     '''
     nr = 0
-    nr += __get__pref_conflicts__(board)
-    return nr
+    i, conflicts2 = __get__pref_conflicts__(board)
+    nr += i
+    return nr, conflicts2
 
 def __get_all_conflicts__(board, profi):
     '''
     Get number of all types of conflicts
     '''
     nr = 0
-    nr += __get_hconflicts__(board, profi)
-    nr += __get_sconflicts__(board)
-    return nr
-
-def __where2__(actionn, sched, cobai):
-    '''
-    On a longer form of a "card"/possibile arrangement 
-    (day, interval, room, teacher, subject) tuple show where to put it in the timetable,
-    according to the timetable with all the possibilities 
-    and the empty slots in the timetable right now.
-    '''
-    positions = []
-    for day in sched:
-        for interval in cobai[day]:
-            for room in cobai[day][interval]:
-                for tuplu in cobai[day][interval][room]:
-                    if len(actionn) >= 4 and actionn[4] == tuplu[1] and actionn[3] == tuplu[0] and sched[day][interval][room] == ():
-                        positions.append((day, interval, room))
-    return positions
-# __my_pretty_print__(__where2__(longer2[0],test,cobai))
-
-def __where21__(action, sched, cobai):
-    '''
-    On a shorter form of a "card"/possibile arrangement 
-    (teacher, subject) tuple show where to put it in the timetable,
-    according to the timetable with all the possibilities 
-    and the empty slots in the timetable right now.
-    '''
-    positions = []
-    for day in sched:
-        for interval in cobai[day]:
-            for room in cobai[day][interval]:
-                for tuplu in cobai[day][interval][room]:
-                    if len(action) >= 2 and action[0] == tuplu[0] and action[1] == tuplu[1] and sched[day][interval][room] == ():
-                        positions.append((day, interval, room))
-    return positions
-# __my_pretty_print__(__where21__(actions[0],test,cobai))
-
-def __all_actions2__(actions):
-    '''
-    Now, generating for each teacher and their subject (teacher, subject) "card" 
-    all possible days and intervals without satisfying the prefferances 
-    with days and intervals just to be sure to fullfill the rooms and timetable.
-    Of course, some teachers may have more then 7 intervals, 
-    but this restriction will be fullfilled in a separate function.
-    '''
-    evryting = []
-    everything = []
-    for materie, cineva in actions:
-        nr = len(zile) * len(intervale)
-        for _ in range(nr):
-            evryting.append((materie, cineva))
-    return evryting
-
-# it stores as many cards as many days and intervals for every teacher
-all_actions = __all_actions2__(actions)
-# __my_pretty_print__(all_actions)
-
-def __get_all_possible_places2__(all_actions, cobai, sched):
-    '''
-    Generate all possible "moves"/places to put 
-    all the "cards" (teacher, course)
-    '''
-    idk = {}
-    for act in all_actions:
-        idk[act] = []
-        dummy = __where21__(act, sched, cobai)
-        idk[act] = dummy
-    return idk
-
-# it stores all the possible places for (teacher, subject) card, 
-# where can be put in timetable
-evriuere = __get_all_possible_places2__(all_actions, cobai, vesnic_gol)
-# __my_pretty_print__(evriuere)
-
+    conflicts = []
+    i, conflicts1 = __get_hconflicts__(board, profi)
+    j, conflicts2 = __get_sconflicts__(board)
+    nr += i
+    nr += j
+    for t in conflicts1:
+        conflicts.append(t)
+    for t in conflicts2:
+        conflicts.append(t)
+    return nr, conflicts
+# --------------------------------------------------------------------------------------
+# the timetable generator part
+# generate from a list
 def __make_move__(sched, profi, cobai):
     places = []
     acts = __generate_actions2__(profi)
     all_acts = __all_actions2__(acts)
     index1 = randint(0, len(all_acts)-1)
     an_action = all_acts[index1]
+    all_acts.remove(an_action)
     places = __where21__(an_action, sched, cobai)
-    while places != []:
-        index1 = randint(0, len(all_acts)-1)
-        an_action = all_acts[index1]
-        places = __where21__(an_action, sched, cobai)
     index2 = randint(0, len(places)-1)
     a_place = places[index2]
     sched[a_place[0]][a_place[1]][a_place[2]] = an_action
+    dummy = (a_place[0], a_place[1], a_place[2])
+    return dummy
 
-def __generate1__(sched, profi, cobai):
+# ok, face o mutare, pana umple salile.
+# dupa ce face o mutare verifica suprapuneri 
+# la suprapuneri -> undo move, si reia procesul
+# apoi se uita pe orar si vede constrangerile soft
+# dk gaseste conflict acolo, sterge 
+# si din pool scoate cu rand pana se potriveste -> la suprapuneri si la preferinte
+
+def __undo_move__(sched, move):
+    sched[move[0]][move[1]][move[2]] = ()
+
+def __generate__(sched, profi, cobai):
     while __get_capacity_conflicts__(sched) > 0:
-        __make_move__(sched,profi,cobai)
-        
-def __generate2__(sched, profi, cobai):
-    while __get_capacity_conflicts__(sched) + __get_overlap_conflicts__(sched) > 0:
-        __make_move__(sched,profi,cobai)
-
-__generate1__(test,profi,cobai)
-# print(pretty_print_timetable(test, filename))
+        idk = __make_move__(sched,profi,cobai)
+        if __get_overlap_conflicts__(sched) > 0:
+            __undo_move__(sched, idk)
+            continue
+# --------------------------------------------------------------------------------------
+# generate from a timetable with all possibilities
+def __populate_cobai2__(cobai, actions):
+    '''
+    Here is generated a whole timetable, but with all constraints not satisfied \n
+    Basically, is a timetable with all possible arrangements/with all possibilities \n
+    On its basis we satisfact/choose what to put in the right timetable
+    '''
+    for i in actions:
+        cobai[i[0]][i[1]][i[2]].append((i[3], i[4]))
 
 def __rand_shuffle_gen1__(sched, cobai):
     '''
@@ -393,9 +369,6 @@ def __rand_shuffle_gen1__(sched, cobai):
                             orar_nou[zi][interval][sala] = cobai[zi][interval][sala].pop(0)
     return orar_nou
 
-orar_nou = __rand_shuffle_gen1__(vesnic_gol, cobai)
-print(pretty_print_timetable(orar_nou, filename))
-
 def __let_s_see__(sched, cobai):
     '''
     This one is an unhappy try of mine for generating reliable timetables,
@@ -405,14 +378,10 @@ def __let_s_see__(sched, cobai):
     nr = 2
     while nr != 0:
         orar_nou = __rand_shuffle_gen1__(sched, cobai)
-        # nr = __compute_conflicts__(orar_nou)
+        nr = __get_overlap_conflicts__(orar_nou)
         if nr == 0:
             idk = orar_nou
     return idk
-
-# for the time I tried to generate a good timetable
-idkk = __let_s_see__(vesnic_gol, cobai)
-# print(pretty_print_timetable(idkk, filename))
 
 def __hai_ca_da__(sched, cobai):
     '''
@@ -422,9 +391,88 @@ def __hai_ca_da__(sched, cobai):
     idk = []
     for _ in range(100):
         hbrnm = __let_s_see__(sched, cobai)
-        print(hbrnm)
         idk.append(hbrnm)
     return idk
+# --------------------------------------------------------------------------------------
+# main
+
+# path
+filename = f'dummy.yaml'
+
+# reader, beacuse I have not seen utils.py until a certian moment, shame on me
+data = None
+with open("dummy.yaml") as stream:
+    try:
+        data = yaml.safe_load(stream)
+    except yaml.YAMLError as exc:
+        print(exc)
+        
+#parser, because 'duh!
+materii = data['Materii']
+intervale1 = data['Intervale']
+profi = data['Profesori']
+sali = data['Sali']
+zile = data['Zile']
+intervale = [eval(i) for i in intervale1]
+
+# initialises the state machine let's call it
+states = []
+
+# we will foreever have an empty timetable
+vesnic_gol = __init_state__(zile, intervale, sali)
+
+# we start with this
+test = __init_state__(zile, intervale, sali)
+
+# on the basis of cobai we generate timetables
+cobai = __init_cobai__(zile, intervale, sali)
+
+# each teacher has preferances
+permisiuni = __get_teach_poate__(profi)
+
+# array with (day, interval, room, teacher, course) tuples
+longer2 = __generate_actions12__(profi, sali, zile, intervale)
+
+# array with (teacher, course_taught_by_that_teacher) tuple aka 'card'
+actions = __generate_actions2__(profi)
+
+# it stores as many 'cards' as many days and intervals for every teacher
+all_actions = __all_actions2__(actions)
+
+# it stores all the possible places for (teacher, subject) card, 
+# where can be put in timetable
+evriuere = __get_all_possible_places2__(all_actions, cobai, vesnic_gol)
+
+# we populate the timetable with all arrangements
+__populate_cobai2__(cobai, longer2)
+
+# my first attempt to generate a timetable out 
+# of a premade 'timetable' with all possible arrangements of course
+orar_nou = __rand_shuffle_gen1__(vesnic_gol, cobai)
+
+# my second attempt to generate a timetable based on cobai but with 'cards' as above
+max_attempts = 10000
+attempts = 0
+success = False
+
+while attempts < max_attempts and not success:
+    try:
+        __generate__(test, profi, cobai)
+        success = True
+    except ValueError as e:
+        attempts += 1
+
+if not success:
+    # print(f"Failed after {attempts} attempts.")
+    exit
+
+# for the time I tried to generate a good timetable with no conflicts 
+# using 1st function to generate
+idkk = __let_s_see__(vesnic_gol, cobai)
                 
+# some attempt to generate 100 good timetables using 1st function to generate
 nuj_fra = __hai_ca_da__(vesnic_gol, cobai)
-# print(nuj_fra)
+
+print(pretty_print_timetable(test, filename))
+
+states.append(test)
