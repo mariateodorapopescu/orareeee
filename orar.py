@@ -1,4 +1,5 @@
 from __future__ import annotations
+import sys
 import yaml
 from typing import Callable
 from copy import copy
@@ -395,84 +396,95 @@ def __hai_ca_da__(sched, cobai):
     return idk
 # --------------------------------------------------------------------------------------
 # main
+if __name__ == "__main__":
+    ok = 0
+    if len(sys.argv) < 3:
+        print("Please provide an algorithm.")
+    else:
+        if sys.argv[1] == "hc":
+            ok = 1
+        else:
+            ok = 2
+    filename = sys.argv[2]
+    # print(filename)
+    
+    # path
+    # filename = f'dummy.yaml'
 
-# path
-filename = f'dummy.yaml'
+    # reader, beacuse I have not seen utils.py until a certian moment, shame on me
+    data = None
+    with open("dummy.yaml") as stream:
+        try:
+            data = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+            
+    #parser, because 'duh!
+    materii = data['Materii']
+    intervale1 = data['Intervale']
+    profi = data['Profesori']
+    sali = data['Sali']
+    zile = data['Zile']
+    intervale = [eval(i) for i in intervale1]
 
-# reader, beacuse I have not seen utils.py until a certian moment, shame on me
-data = None
-with open("dummy.yaml") as stream:
-    try:
-        data = yaml.safe_load(stream)
-    except yaml.YAMLError as exc:
-        print(exc)
-        
-#parser, because 'duh!
-materii = data['Materii']
-intervale1 = data['Intervale']
-profi = data['Profesori']
-sali = data['Sali']
-zile = data['Zile']
-intervale = [eval(i) for i in intervale1]
+    # initialises the state machine let's call it
+    states = []
 
-# initialises the state machine let's call it
-states = []
+    # we will foreever have an empty timetable
+    vesnic_gol = __init_state__(zile, intervale, sali)
 
-# we will foreever have an empty timetable
-vesnic_gol = __init_state__(zile, intervale, sali)
+    # we start with this
+    test = __init_state__(zile, intervale, sali)
 
-# we start with this
-test = __init_state__(zile, intervale, sali)
+    # on the basis of cobai we generate timetables
+    cobai = __init_cobai__(zile, intervale, sali)
 
-# on the basis of cobai we generate timetables
-cobai = __init_cobai__(zile, intervale, sali)
+    # each teacher has preferances
+    permisiuni = __get_teach_poate__(profi)
 
-# each teacher has preferances
-permisiuni = __get_teach_poate__(profi)
+    # array with (day, interval, room, teacher, course) tuples
+    longer2 = __generate_actions12__(profi, sali, zile, intervale)
 
-# array with (day, interval, room, teacher, course) tuples
-longer2 = __generate_actions12__(profi, sali, zile, intervale)
+    # array with (teacher, course_taught_by_that_teacher) tuple aka 'card'
+    actions = __generate_actions2__(profi)
 
-# array with (teacher, course_taught_by_that_teacher) tuple aka 'card'
-actions = __generate_actions2__(profi)
+    # it stores as many 'cards' as many days and intervals for every teacher
+    all_actions = __all_actions2__(actions)
 
-# it stores as many 'cards' as many days and intervals for every teacher
-all_actions = __all_actions2__(actions)
+    # it stores all the possible places for (teacher, subject) card, 
+    # where can be put in timetable
+    evriuere = __get_all_possible_places2__(all_actions, cobai, vesnic_gol)
 
-# it stores all the possible places for (teacher, subject) card, 
-# where can be put in timetable
-evriuere = __get_all_possible_places2__(all_actions, cobai, vesnic_gol)
+    # we populate the timetable with all arrangements
+    __populate_cobai2__(cobai, longer2)
 
-# we populate the timetable with all arrangements
-__populate_cobai2__(cobai, longer2)
+    # my first attempt to generate a timetable out 
+    # of a premade 'timetable' with all possible arrangements of course
+    orar_nou = __rand_shuffle_gen1__(vesnic_gol, cobai)
 
-# my first attempt to generate a timetable out 
-# of a premade 'timetable' with all possible arrangements of course
-orar_nou = __rand_shuffle_gen1__(vesnic_gol, cobai)
+    # my second attempt to generate a timetable based on cobai but with 'cards' as above
+    max_attempts = 10000
+    attempts = 0
+    success = False
 
-# my second attempt to generate a timetable based on cobai but with 'cards' as above
-max_attempts = 10000
-attempts = 0
-success = False
+    while attempts < max_attempts and not success:
+        try:
+            __generate__(test, profi, cobai)
+            success = True
+        except ValueError as e:
+            attempts += 1
 
-while attempts < max_attempts and not success:
-    try:
-        __generate__(test, profi, cobai)
-        success = True
-    except ValueError as e:
-        attempts += 1
+    if not success:
+        # print(f"Failed after {attempts} attempts.")
+        exit
 
-if not success:
-    # print(f"Failed after {attempts} attempts.")
-    exit
+    # for the time I tried to generate a good timetable with no conflicts 
+    # using 1st function to generate
+    idkk = __let_s_see__(vesnic_gol, cobai)
+                    
+    # some attempt to generate 100 good timetables using 1st function to generate
+    nuj_fra = __hai_ca_da__(vesnic_gol, cobai)
 
-# for the time I tried to generate a good timetable with no conflicts 
-# using 1st function to generate
-idkk = __let_s_see__(vesnic_gol, cobai)
-                
-# some attempt to generate 100 good timetables using 1st function to generate
-nuj_fra = __hai_ca_da__(vesnic_gol, cobai)
+    print(pretty_print_timetable(test, filename))
 
-print(pretty_print_timetable(test, filename))
-
-states.append(test)
+    states.append(test)
