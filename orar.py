@@ -285,6 +285,7 @@ def __get_capacity_conflicts__(board):
             nr += 1
     return nr
 
+
 def __get_overlap_conflicts__(board):
     '''
     Checks to see if a teacher is NOT in two different places in the same time
@@ -472,49 +473,36 @@ def __hai_ca_da__(sched, cobai):
 def is_final(state):
     return __get_capacity_conflicts__(state) == 0
     
-def hill_climbing(initial, max_iters, profi, longer, cobai, permisiuni):
-    '''
-    iau orar,
-    fac copie, fac next move, verific dk dupa next move exis constr il pun
-    doar urm stare -> un vecin,
-    
-    '''
-    ok = False
-    iters, states = 0, 0
-    state = deepcopy(initial)
-    while iters < max_iters:
-        iters += 1
-        index = randint(0, len(longer) - 1)
-        move = longer[index]
-        vecin = deepcopy(state)
-        where = __aply_move__(move, vecin)
-        crt_cost = __get_all_conflicts__(state, profi, permisiuni)
-        states += 1
-        best_v, best_c = state, crt_cost
-        cost_vecin = __get_all_conflicts__(vecin, profi, permisiuni)
-        if cost_vecin < best_c:
-            best_v = vecin
-            best_c = cost_vecin
-        if best_c >= crt_cost:
-            break
-        else:
-            state = best_v
-        ok = is_final(state)
-        
-    return ok, iters, states, state
+def hill_climbing(initial_state, actions, profi, max_iters):
+    current_state = deepcopy(initial_state)
+    best_conflicts = __get_hconflicts__(current_state, profi)
+    for _ in range(max_iters):
+        action = actions.pop()  # Get a random action
+        successful = __aply_move__(action, current_state)
+        if successful:
+            current_conflicts = __get_hconflicts__(current_state, profi)
+            if current_conflicts > best_conflicts:
+                best_conflicts = current_conflicts
+            else:
+                __undo_move__(current_state, action)  # Undo the move if it doesn't improve
+        if not actions:  # If no actions left, reshuffle
+            actions = __generate_actions1__(profi, sali, zile, intervale)  # Regenerate actions
+            shuffle(actions)
+    return current_state
 
-def random_restart_hill_climbing(initial, max_restarts, run_max_iters, profi, longer, cobai, permisiuni):
+
+def random_restart_hill_climbing(initial, max_restarts, run_max_iters, actions, profi):
     total_iters, total_states = 0, 0
     state = deepcopy(initial)
     for _ in range(max_restarts):
-        ok, nr_iter_curr, stari_currente, stare_curr = hill_climbing(state, max_restarts, profi, longer, cobai, permisiuni)
-        total_iters += nr_iter_curr
-        total_states += stari_currente
+        stare_curr = hill_climbing(state, actions, profi, run_max_iters)
+        total_iters += 1
+        total_states += 1
         if ok:
             break
         else:
             state = stare_curr
-    return ok, total_iters, total_states, state
+    return state
 
 # --------------------------------------------------------------------------------------
 # main
@@ -612,5 +600,6 @@ if __name__ == "__main__":
     # states.append(test)
     
     if ok == 1:
-        random_restart_hill_climbing(test, 10000, 10000, profi, longer, cobai, permisiuni)
-    print(pretty_print_timetable(test, filename))
+        state = hill_climbing(test, longer, profi, 10000)
+        print(test)
+        print(pretty_print_timetable(state, filename))
