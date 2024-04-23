@@ -12,6 +12,7 @@ import random
 # imports
 # --------------------------------------------------------------------------------------
 # formatting
+# merge
 def __my_pretty_print__(Any):
     '''
     My pretty print for testing purposes
@@ -22,6 +23,7 @@ def __my_pretty_print__(Any):
     print("--------------------------------------------")
 # --------------------------------------------------------------------------------------
 # initialize things, make the background, let's say
+# merge
 def __init_state__(zile, intervale, sali):
     '''
     Initialize state
@@ -37,6 +39,7 @@ def __init_state__(zile, intervale, sali):
                 sched[i][j][k] = ()
     return sched
 
+# discutabil
 def __init_cobai__(zile, intervale, sali):
     '''
     Initializes the 'timetable' in which we put all the possible arrangements \n
@@ -53,7 +56,33 @@ def __init_cobai__(zile, intervale, sali):
                 # the possibilities of tech and subject so we can make generations
     return sched
 # --------------------------------------------------------------------------------------
+# T/F
+# merge
+def right_day_interval(teacher, action, permisiuni):
+    '''
+    Action is a longer card that consists of (day, interval, room, teacher, subject) and
+    we verify on day, interval, room if the teacher can teach
+    '''
+    if action[0] in permisiuni[teacher]['zile_ok'] and action[1] in permisiuni[teacher]['ore_ok']:
+        return True
+    return False
+
+# merge
+def right_room(room, action, sali):
+    '''
+    Action is a longer card that consists of (day, interval, room, teacher, subject) and
+    we verify on action if room is suitable for that subject
+    '''
+    return action[4] in sali[action[2]]['Materii']
+
+# merge
+def right_teacher(teacher, action, profi):
+    return action[3] in profi[teacher]['Materii']
+                
+
+# --------------------------------------------------------------------------------------
 # getters
+# merge, desi e discutabil
 def __get_teach_poate__(profi):
     '''
     Genereates all the intervals in which a teacher can teach \n
@@ -87,7 +116,7 @@ def __get_teach_poate__(profi):
                 teach[i]['ore_ok'] = ore_ok
                 teach[i]['zile_ok'] = zile_ok
     return teach
-
+# meh
 def __get_teach_table__(board, teacher, zile, intervale, sali):
     '''
     Trying to achieve the bonus bullet, but it's just a thought...
@@ -103,6 +132,7 @@ def __get_teach_table__(board, teacher, zile, intervale, sali):
     return table
 # --------------------------------------------------------------------------------------
 # generators of parts for timetable generator
+# merge
 def __generate_actions12__(profi, sali, zile, intervale):
     ''' 
     Generates all possible actions from the lists of days, intervals, teachers
@@ -125,6 +155,24 @@ def __generate_actions12__(profi, sali, zile, intervale):
     good_actions = sorted(list(set(actions)), key=lambda x: (x[0], x[1], x[2]))
     return good_actions
 
+# merge x 2
+def __generate_actions1__(profi, sali, zile, intervale):
+    ''' 
+    Generates all possible actions from the lists of days, intervals, teachers
+    in order to satisfact the constraints of days, intervals 
+    and their own subjects with rooms for each subject for teachers
+    '''
+    actions = []
+    for zi in zile:
+        for ore in intervale:
+            for sala in sali:
+                for teach in profi:
+                    for materie in materii:
+                        dummy = (zi, ore, sala, teach, materie)
+                        actions.append(dummy)
+    return actions
+
+# discutabil
 def __generate_actions2__(profi):
     '''
     Generates "cards" of teachers and the subject of teach
@@ -138,6 +186,7 @@ def __generate_actions2__(profi):
             actions.append(dummy)
     return actions
 
+# discutabil -> nici nu stiu dk o folosesc -> O S-O FOLOSESC!
 def __where2__(actionn, sched, cobai):
     '''
     On a longer form of a "card"/possibile arrangement 
@@ -154,6 +203,7 @@ def __where2__(actionn, sched, cobai):
                         positions.append((day, interval, room))
     return positions
 
+# discutabil
 def __where21__(action, sched, cobai):
     '''
     On a shorter form of a "card"/possibile arrangement 
@@ -170,6 +220,7 @@ def __where21__(action, sched, cobai):
                         positions.append((day, interval, room))
     return positions
 
+# discutabil x 2
 def __all_actions2__(actions):
     '''
     Now, generating for each teacher and their subject (teacher, subject) "card" 
@@ -186,6 +237,7 @@ def __all_actions2__(actions):
             evryting.append((materie, cineva))
     return evryting
 
+# discutabil x 3
 def __get_all_possible_places2__(all_actions, cobai, sched):
     '''
     Generate all possible "moves"/places to put 
@@ -323,6 +375,17 @@ def __make_move__(sched, profi, cobai):
     dummy = (a_place[0], a_place[1], a_place[2])
     return dummy
 
+# vedem
+def __aply_move__(action, sched):
+    '''
+    Just puts a longer card in timetable. No more shorter cards
+    '''
+    dummy = None
+    if sched[action[0]][action[1]][action[2]] == ():
+        sched[action[0]][action[1]][action[2]] = (action[3], action[4])
+        dummy = (action[0], action[1], action[2])
+    return dummy
+
 # ok, face o mutare, pana umple salile.
 # dupa ce face o mutare verifica suprapuneri 
 # la suprapuneri -> undo move, si reia procesul
@@ -332,13 +395,25 @@ def __make_move__(sched, profi, cobai):
 
 def __undo_move__(sched, move):
     sched[move[0]][move[1]][move[2]] = ()
+    
+def __my_generate__(sched, all_actions):
+    while __get_capacity_conflicts__(sched) > 0 and longer2 != []:
+        index = randint(0, len(all_actions) - 1)
+        tuplee = all_actions[index]
+        all_actions.remove(tuplee)
+        if sched[tuplee[0]][tuplee[1]][tuplee[2]] == ():
+            sched[tuplee[0]][tuplee[1]][tuplee[2]] = (tuplee[3], tuplee[4])
 
-def __generate__(sched, profi, cobai):
+def __generate__(sched, profi, cobai, permisiuni):
     while __get_capacity_conflicts__(sched) > 0:
         idk = __make_move__(sched,profi,cobai)
         if __get_overlap_conflicts__(sched) > 0:
             __undo_move__(sched, idk)
             continue
+        else:
+            if __get__pref_conflicts__(sched, permisiuni):
+                __undo_move__(sched, idk)
+                continue
 # --------------------------------------------------------------------------------------
 # generate from a timetable with all possibilities
 def __populate_cobai2__(cobai, actions):
@@ -442,6 +517,8 @@ if __name__ == "__main__":
     # each teacher has preferances
     permisiuni = __get_teach_poate__(profi)
 
+    longer = __generate_actions1__(profi, sali, zile, intervale)
+
     # array with (day, interval, room, teacher, course) tuples
     longer2 = __generate_actions12__(profi, sali, zile, intervale)
 
@@ -469,7 +546,7 @@ if __name__ == "__main__":
 
     while attempts < max_attempts and not success:
         try:
-            __generate__(test, profi, cobai)
+            # __generate__(test, profi, cobai, permisiuni)
             success = True
         except ValueError as e:
             attempts += 1
@@ -477,7 +554,7 @@ if __name__ == "__main__":
     if not success:
         # print(f"Failed after {attempts} attempts.")
         exit
-
+    __my_generate__(test, longer)
     # for the time I tried to generate a good timetable with no conflicts 
     # using 1st function to generate
     idkk = __let_s_see__(vesnic_gol, cobai)
