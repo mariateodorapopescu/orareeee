@@ -327,37 +327,33 @@ def __get_hconflicts__(board, profi):
     '''
     nr = 0
     i = __get_capacity_conflicts__(board)
-    j, conflicts1 = __get_overlap_conflicts__(board)
+    j = __get_overlap_conflicts__(board)
     k = __get_overh_conflicts__(board, profi)
     nr += i
     nr += j
     nr += k
-    return nr, conflicts1
+    return nr
 
-def __get_sconflicts__(board):
+def __get_sconflicts__(board, permisiuni):
     '''
     Get number of soft conflicts
     '''
     nr = 0
-    i, conflicts2 = __get__pref_conflicts__(board)
+    i = __get__pref_conflicts__(board, permisiuni)
     nr += i
-    return nr, conflicts2
+    return nr
 
-def __get_all_conflicts__(board, profi):
+def __get_all_conflicts__(board, profi, permisiuni):
     '''
     Get number of all types of conflicts
     '''
     nr = 0
     conflicts = []
-    i, conflicts1 = __get_hconflicts__(board, profi)
-    j, conflicts2 = __get_sconflicts__(board)
+    i = __get_hconflicts__(board, profi)
+    j = __get_sconflicts__(board, permisiuni)
     nr += i
     nr += j
-    for t in conflicts1:
-        conflicts.append(t)
-    for t in conflicts2:
-        conflicts.append(t)
-    return nr, conflicts
+    return nr
 # --------------------------------------------------------------------------------------
 # the timetable generator part
 # generate from a list
@@ -469,6 +465,57 @@ def __hai_ca_da__(sched, cobai):
         hbrnm = __let_s_see__(sched, cobai)
         idk.append(hbrnm)
     return idk
+
+# --------------------------------------------------------------------------------------
+# algorithms part
+# hill climbing
+def is_final(state):
+    return __get_capacity_conflicts__(state) == 0
+    
+def hill_climbing(initial, max_iters, profi, longer, cobai, permisiuni):
+    '''
+    iau orar,
+    fac copie, fac next move, verific dk dupa next move exis constr il pun
+    doar urm stare -> un vecin,
+    
+    '''
+    ok = False
+    iters, states = 0, 0
+    state = deepcopy(initial)
+    while iters < max_iters:
+        iters += 1
+        index = randint(0, len(longer) - 1)
+        move = longer[index]
+        vecin = deepcopy(state)
+        where = __aply_move__(move, vecin)
+        crt_cost = __get_all_conflicts__(state, profi, permisiuni)
+        states += 1
+        best_v, best_c = state, crt_cost
+        cost_vecin = __get_all_conflicts__(vecin, profi, permisiuni)
+        if cost_vecin < best_c:
+            best_v = vecin
+            best_c = cost_vecin
+        if best_c >= crt_cost:
+            break
+        else:
+            state = best_v
+        ok = is_final(state)
+        
+    return ok, iters, states, state
+
+def random_restart_hill_climbing(initial, max_restarts, run_max_iters, profi, longer, cobai, permisiuni):
+    total_iters, total_states = 0, 0
+    state = deepcopy(initial)
+    for _ in range(max_restarts):
+        ok, nr_iter_curr, stari_currente, stare_curr = hill_climbing(state, max_restarts, profi, longer, cobai, permisiuni)
+        total_iters += nr_iter_curr
+        total_states += stari_currente
+        if ok:
+            break
+        else:
+            state = stare_curr
+    return ok, total_iters, total_states, state
+
 # --------------------------------------------------------------------------------------
 # main
 if __name__ == "__main__":
@@ -554,7 +601,7 @@ if __name__ == "__main__":
     if not success:
         # print(f"Failed after {attempts} attempts.")
         exit
-    __my_generate__(test, longer)
+    # __my_generate__(test, longer)
     # for the time I tried to generate a good timetable with no conflicts 
     # using 1st function to generate
     idkk = __let_s_see__(vesnic_gol, cobai)
@@ -562,6 +609,8 @@ if __name__ == "__main__":
     # some attempt to generate 100 good timetables using 1st function to generate
     nuj_fra = __hai_ca_da__(vesnic_gol, cobai)
 
+    # states.append(test)
+    
+    if ok == 1:
+        random_restart_hill_climbing(test, 10000, 10000, profi, longer, cobai, permisiuni)
     print(pretty_print_timetable(test, filename))
-
-    states.append(test)
