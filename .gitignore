@@ -3,5 +3,6 @@ __pycache__
 
 # Ignore specific files
 ceva.txt
+check_constraints.py
 .DS_Store
 

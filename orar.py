@@ -78,8 +78,6 @@ def right_room(room, action, sali):
 # merge
 def right_teacher(teacher, action, profi):
     return action[3] in profi[teacher]['Materii']
-                
-
 # --------------------------------------------------------------------------------------
 # getters
 # merge, desi e discutabil
@@ -251,6 +249,7 @@ def __get_all_possible_places2__(all_actions, cobai, sched):
     return idk
 # --------------------------------------------------------------------------------------
 # conflicts
+# mainly all are used
 def __get__pref_conflicts__(sched, permisiuni):
     '''
     Checks soft permissions without the !Pauza constraint
@@ -266,6 +265,7 @@ def __get__pref_conflicts__(sched, permisiuni):
                             nr += 1
     return nr
 
+# da!
 def __get_capacity_conflicts__(board):
     '''
     Checks whether all students have a seat in the rooms
@@ -377,40 +377,14 @@ def __aply_move__(action, sched):
     '''
     Just puts a longer card in timetable. No more shorter cards
     '''
-    dummy = None
+    dummy = ()
     if sched[action[0]][action[1]][action[2]] == ():
         sched[action[0]][action[1]][action[2]] = (action[3], action[4])
         dummy = (action[0], action[1], action[2])
     return dummy
 
-# ok, face o mutare, pana umple salile.
-# dupa ce face o mutare verifica suprapuneri 
-# la suprapuneri -> undo move, si reia procesul
-# apoi se uita pe orar si vede constrangerile soft
-# dk gaseste conflict acolo, sterge 
-# si din pool scoate cu rand pana se potriveste -> la suprapuneri si la preferinte
-
 def __undo_move__(sched, move):
     sched[move[0]][move[1]][move[2]] = ()
-    
-def __my_generate__(sched, all_actions):
-    while __get_capacity_conflicts__(sched) > 0 and longer2 != []:
-        index = randint(0, len(all_actions) - 1)
-        tuplee = all_actions[index]
-        all_actions.remove(tuplee)
-        if sched[tuplee[0]][tuplee[1]][tuplee[2]] == ():
-            sched[tuplee[0]][tuplee[1]][tuplee[2]] = (tuplee[3], tuplee[4])
-
-def __generate__(sched, profi, cobai, permisiuni):
-    while __get_capacity_conflicts__(sched) > 0:
-        idk = __make_move__(sched,profi,cobai)
-        if __get_overlap_conflicts__(sched) > 0:
-            __undo_move__(sched, idk)
-            continue
-        else:
-            if __get__pref_conflicts__(sched, permisiuni):
-                __undo_move__(sched, idk)
-                continue
 # --------------------------------------------------------------------------------------
 # generate from a timetable with all possibilities
 def __populate_cobai2__(cobai, actions):
@@ -422,76 +396,59 @@ def __populate_cobai2__(cobai, actions):
     for i in actions:
         cobai[i[0]][i[1]][i[2]].append((i[3], i[4]))
 
-def __rand_shuffle_gen1__(sched, cobai):
+def get_aviable_actions(state, longer, cobai):
     '''
-    1st verion of generating a timetable, by shuffling 
-    the test timetable (cobai) with everything in it
-    In time I realised that there can be other ways of generating a timetable, 
-    see 2nd version. This one does not satisfy any restiction. =(
-    '''
-    orar_nou = deepcopy(sched)
-    for zi in orar_nou:
-        for interval in orar_nou[zi]:
-            for sala in orar_nou[zi][interval]:
-                if orar_nou[zi][interval][sala] == ():
-                    if cobai[zi][interval][sala] != []:
-                        if randint(0, 1) == 0:
-                            orar_nou[zi][interval][sala] = cobai[zi][interval][sala][randint(0, len(cobai[zi][interval][sala]) - 1)]
-                        else:
-                            shuffle(cobai[zi][interval][sala])
-                            orar_nou[zi][interval][sala] = cobai[zi][interval][sala].pop(0)
-    return orar_nou
-
-def __let_s_see__(sched, cobai):
-    '''
-    This one is an unhappy try of mine for generating reliable timetables,
-    until I moved to the algorithms
-    '''
-    idk = None
-    nr = 2
-    while nr != 0:
-        orar_nou = __rand_shuffle_gen1__(sched, cobai)
-        nr = __get_overlap_conflicts__(orar_nou)
-        if nr == 0:
-            idk = orar_nou
-    return idk
-
-def __hai_ca_da__(sched, cobai):
-    '''
-    This one is an unhappy try of mine for generating reliable timetables,
-    until I moved to the algorithms
+    Here are generated all possible places for a long tuple of
+    (day, interval, room, teacher, subject) in an array.
     '''
     idk = []
-    for _ in range(100):
-        hbrnm = __let_s_see__(sched, cobai)
-        idk.append(hbrnm)
+    for tuplee in longer:
+        if state[tuplee[0]][tuplee[1]][tuplee[2]] == () and (tuplee[3], tuplee[4]) in cobai[tuplee[0]][tuplee[1]][tuplee[2]]:
+            idk.append(tuplee)
     return idk
 
 # --------------------------------------------------------------------------------------
 # algorithms part
 # hill climbing
+
 def is_final(state):
+    '''
+    For me, the final state is the one in which all students have where to stay
+    '''
     return __get_capacity_conflicts__(state) == 0
     
-def hill_climbing(initial_state, actions, profi, max_iters):
+def hill_climbing(initial_state, actions, profi, cobai, max_iters):
+    '''
+    A modified version from the HC laboratory
+    '''
     current_state = deepcopy(initial_state)
-    best_conflicts = __get_hconflicts__(current_state, profi)
+    current_conflicts = __get_hconflicts__(current_state, profi)
+    best_conflicts = current_conflicts
+    best_state = deepcopy(current_state)
     for _ in range(max_iters):
-        action = actions.pop()  # Get a random action
-        successful = __aply_move__(action, current_state)
-        if successful:
-            current_conflicts = __get_hconflicts__(current_state, profi)
-            if current_conflicts > best_conflicts:
-                best_conflicts = current_conflicts
-            else:
-                __undo_move__(current_state, action)  # Undo the move if it doesn't improve
-        if not actions:  # If no actions left, reshuffle
-            actions = __generate_actions1__(profi, sali, zile, intervale)  # Regenerate actions
-            shuffle(actions)
-    return current_state
-
+        current_conflicts = __get_hconflicts__(current_state, profi)
+        okok = get_aviable_actions(current_state, actions, cobai)
+        if okok == []:
+            break
+        index = randint(0, len(okok) - 1)
+        action = okok[index]
+        vecin = deepcopy(current_state)
+        move = __aply_move__(action, vecin)
+        confl = __get_hconflicts__(vecin, profi)
+        current_conflicts = __get_hconflicts__(current_state, profi)
+        if current_conflicts < best_conflicts:
+            best_conflicts = current_conflicts
+        else:
+            # __undo_move__(current_state, action)
+            best_state = deepcopy(vecin)
+            best_conflicts = confl
+            current_state = deepcopy(vecin)
+    return best_state
 
 def random_restart_hill_climbing(initial, max_restarts, run_max_iters, actions, profi):
+    '''
+    I tried something but it didn't work.
+    '''
     total_iters, total_states = 0, 0
     state = deepcopy(initial)
     for _ in range(max_restarts):
@@ -509,21 +466,19 @@ def random_restart_hill_climbing(initial, max_restarts, run_max_iters, actions, 
 if __name__ == "__main__":
     ok = 0
     if len(sys.argv) < 3:
-        print("Please provide an algorithm.")
+        print("Please provide algo + input.")
     else:
         if sys.argv[1] == "hc":
             ok = 1
         else:
-            ok = 2
-    filename = sys.argv[2]
-    # print(filename)
-    
-    # path
-    # filename = f'dummy.yaml'
-
-    # reader, beacuse I have not seen utils.py until a certian moment, shame on me
+            if sys.argv[1] == "mcts":
+                ok = 2
+            else:
+                print("Please provide right algo")
+    filename = "inputs/" + sys.argv[2]
+    # my reader
     data = None
-    with open("dummy.yaml") as stream:
+    with open(filename) as stream:
         try:
             data = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
@@ -567,39 +522,8 @@ if __name__ == "__main__":
     # where can be put in timetable
     evriuere = __get_all_possible_places2__(all_actions, cobai, vesnic_gol)
 
-    # we populate the timetable with all arrangements
-    __populate_cobai2__(cobai, longer2)
-
-    # my first attempt to generate a timetable out 
-    # of a premade 'timetable' with all possible arrangements of course
-    orar_nou = __rand_shuffle_gen1__(vesnic_gol, cobai)
-
-    # my second attempt to generate a timetable based on cobai but with 'cards' as above
-    max_attempts = 10000
-    attempts = 0
-    success = False
-
-    while attempts < max_attempts and not success:
-        try:
-            # __generate__(test, profi, cobai, permisiuni)
-            success = True
-        except ValueError as e:
-            attempts += 1
-
-    if not success:
-        # print(f"Failed after {attempts} attempts.")
-        exit
-    # __my_generate__(test, longer)
-    # for the time I tried to generate a good timetable with no conflicts 
-    # using 1st function to generate
-    idkk = __let_s_see__(vesnic_gol, cobai)
-                    
-    # some attempt to generate 100 good timetables using 1st function to generate
-    nuj_fra = __hai_ca_da__(vesnic_gol, cobai)
-
-    # states.append(test)
-    
     if ok == 1:
-        state = hill_climbing(test, longer, profi, 10000)
-        print(test)
+        # we populate the timetable with all arrangements
+        __populate_cobai2__(cobai, longer)
+        state = hill_climbing(test, longer, profi, cobai, 10000)
         print(pretty_print_timetable(state, filename))
