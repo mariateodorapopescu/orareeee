@@ -123,6 +123,16 @@ def __generate_actions123__(profi, sali, zile, intervale):
                             actions.append(dummy)
     return actions
 
+def __get__teach__number__(state, t):
+    nr = 0
+    for day in state:
+        for hours in state[day]:
+            for room in state[day][hours]:
+                if state[day][hours][room] != () and len(state[day][hours][room]) >= 1:
+                    if state[day][hours][room][0] == t:
+                        nr += 1
+    return nr
+
 def __get_aviable_actions__(state, profi, sali, zile, intervale, materii, poate):
     ''' 
     Generates all possible actions from the lists of days, intervals, teachers
@@ -135,6 +145,10 @@ def __get_aviable_actions__(state, profi, sali, zile, intervale, materii, poate)
         for hours in intervale:
             for room in sali:
                 for t in profi:
+                    overh = False
+                    nr = __get__teach__number__(state, t)
+                    if nr > 7: # daca prof are mai mult de 7 intervale in orar
+                        overh = True
                     for sub in materii:
                         if state[day][hours][room] == ():
                             if sub in profi[t]['Materii']: # proful preda materia aia
@@ -147,7 +161,7 @@ def __get_aviable_actions__(state, profi, sali, zile, intervale, materii, poate)
                                                     if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
                                                         overlap = True
                                                         break
-                                            if not overlap:
+                                            if not overlap and not overh:
                                                 dummy = (day, hours, room, t, sub)
                                                 actions.append(dummy)
     return actions
@@ -330,32 +344,6 @@ def is_final(state):
     For me, the final state is the one in which all students have where to stay
     '''
     return __get_capacity_conflicts__(state) == 0
-    
-def hill_climbing(initial_state, actions, profi, permisiuni, cobai, max_iters):
-    '''
-    A modified version from the HC laboratory
-    '''
-    current_state = deepcopy(initial_state)
-    best_conflicts = __get_all_conflicts__(current_state, profi, permisiuni)
-    best_state = deepcopy(current_state)
-    for _ in range(max_iters):
-        current_conflicts = __get_all_conflicts__(current_state, profi, permisiuni)
-        okok = get_aviable_actions(current_state, actions, cobai)
-        if okok == []:
-            break
-        index = randint(0, len(okok) - 1)
-        action = okok[index]
-        vecin = deepcopy(current_state)
-        move = __aply_move__(action, vecin)
-        confl = __get_all_conflicts__(vecin, profi, permisiuni)
-        if current_conflicts < best_conflicts:
-            best_conflicts = current_conflicts
-        else:
-            # __undo_move__(current_state, action)
-            best_state = deepcopy(vecin)
-            best_conflicts = confl
-            current_state = deepcopy(vecin)
-    return best_state
 
 def hill_climbing1(initial_state, profi, permisiuni, max_iters, sali, zile, intervale, materii):
     '''
@@ -373,12 +361,10 @@ def hill_climbing1(initial_state, profi, permisiuni, max_iters, sali, zile, inte
         action = okok[index]
         vecin = deepcopy(current_state)
         move = __aply_move__(action, vecin)
-        # if is_valid
         confl = __get_all_conflicts__(vecin, profi, permisiuni)
         if current_conflicts < best_conflicts: 
             best_conflicts = current_conflicts
         else:
-            # __undo_move__(current_state, action)
             best_state = deepcopy(vecin)
             best_conflicts = confl
             current_state = deepcopy(vecin)
