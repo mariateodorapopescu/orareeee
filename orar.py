@@ -378,7 +378,8 @@ def print_tree(tree, indent = 0):
     print("%sN = %d, Q = %f" % (tab, tree[N], tree[Q]))
     for a in tree[ACTIONS]:
         print("%s %d ==> " % (tab, a))
-        print_tree(tree[ACTIONS][a], indent + 3)
+        print_tree(tree[ACTIONS][a], indent + 3) 
+        # ??? probabil o sa scap de ea, vedem
                  
 def init_node(state, parent = None):
     '''
@@ -390,6 +391,7 @@ def init_node(state, parent = None):
     Actions is as it is in the lab state -> next-state
     '''
     return {N: 0, Q: 0, STATE: state, PARENT: parent, ACTIONS: {}}
+    #  asta e gen nodul radacina
 
 def select_action(node, c, profi, permisiuni):
     '''
@@ -406,16 +408,21 @@ def select_action(node, c, profi, permisiuni):
         if nod[N] == 0: # asta da
             scor = float('inf')
         else:
-            expandare = nod[Q] / nod[N] # ok
+            expandare = nod[Q] / nod[N] # ok, 
+            # ia gen nodul curent, state ul curent din nodul dat ca parametru si face calcule pe el
             explorare = c * sqrt(2 * log(N_node) / nod[N]) # okkk
             nconflicts = __get_all_conflicts__(nod[STATE], profi, permisiuni) # o sa pun in calcul si constraint-uri
             scor = expandare + explorare + nconflicts # oook
-        if mutare_optima is None or scor < max_scor:
-            mutare_optima = mutare # asta nu stiu de unde sa o iau, hai sa vedem
+        if mutare_optima is None or scor < max_scor: 
+            # la mine e pe dos, scorul este numarul de toate tipurile
+            # de conflicte si prin urmare cu cat sunt mai putine conflicte, 
+            # cu atat scorul e mai bun, orarul e mai bun, este un fel de logica negativa
+            mutare_optima = mutare # asta nu stiu de unde sa o iau, hai sa vedem 
+            # -> mutarea ar trebui sa fie un tuplu, sau unde s-a pus un tuplu din acela (prof, materie)
             max_scor = scor # la mine max scor e min scor
     return mutare_optima
 
-def mcts(state0, budget, tree, opponent_s_action = None):
+def mcts(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, materii, permisiuni):
     '''
     Algoritmul MCTS (UCT)
     state0 - tabelul pentru care trebuie aleasă o acțiune/mutare/tuplu
@@ -433,36 +440,37 @@ def mcts(state0, budget, tree, opponent_s_action = None):
     if tree is not None and opponent_s_action in tree[ACTIONS]:
         tree = tree[ACTIONS][opponent_s_action]
     else:
-        tree = init_node(init_state())
-    # tree = None # TODO
+        tree = init_node(__init_state__(zile, intervale, sali)) # asta se lasa asa ca e algoritmul de generare in sine, 
+        # chestia ce se modifica cred ca are loc mai sus, la select action
     
     #---------------------------------------------------------------
 
     for x in range(budget):
         # Pornim procesul de selecție din nodul rădăcină / starea inițială
+        # buget vine un fel de max_iter din hill_climbing
         node = tree
         state = state0
         # TODO <4>
         # Coborâm în arbore până când ajungem la o stare finală
         # sau la un nod cu acțiuni neexplorate.
         while not is_final(state):
-            posibilitati = get_available_actions(state)
+            posibilitati = __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)
             if not all(mutare in node[ACTIONS] for mutare in posibilitati):
                 break
             mutare_noua = select_action(node)
             node = node[ACTIONS][mutare_noua]
-            state = apply_action(state, mutare_noua)
-        
+            unde = __aply_move__(mutare_noua, state)
+            
         #---------------------------------------------------------------
         
         # TODO <5>
         # Dacă am ajuns într-un nod care nu este final și din care nu s-au
         # `încercat` toate acțiunile, construim un nod nou.
-        isok = get_available_actions(state)
+        isok = __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)
         if not is_final(state) and isok is not None: 
-            # alea de mai de sus se recicleaza pentrua  putea trece mai departe
+            # alea de mai de sus se recicleaza pentru a  putea trece mai departe
             alta_mutare_noua = choice(isok) # se recicleaza ca merge pana la 2 nivele in arb
-            state = apply_action(state, alta_mutare_noua)
+            undee = __aply_move__(alta_mutare_noua, state)
             nod_nou = init_node(state, node)
             # acum trece mai departe
             if nod_nou is not None:
@@ -478,9 +486,9 @@ def mcts(state0, budget, tree, opponent_s_action = None):
         # starea finală. Se evaluează recompensa în acea stare.
         # state = state0 # de înlocuit cu node[STATE]
         while not is_final(state):
-            posibilitati = get_available_actions(state)
-            mutare = choice(posibilitati)
-            state = apply_action(state, mutare)
+            posibilitati = __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)
+            mutare = choice(posibilitati) # asta e un rand index
+            state = __aply_move__(mutare, state)
             # break
         
         winner = is_final(state)
@@ -512,8 +520,8 @@ def mcts(state0, budget, tree, opponent_s_action = None):
         final_action = select_action(tree, 0.0)
         return (final_action, tree[ACTIONS][final_action])
     # Acest cod este aici doar ca să nu dea erori testele mai jos; în mod normal tree nu trebuie să fie None
-    if get_available_actions(state0):
-        return (get_available_actions(state0)[0], init_node())
+    if __get_aviable_actions__(state0, profi, sali, zile, intervale, materii, permisiuni):
+        return (__get_aviable_actions__(state0, profi, sali, zile, intervale, materii, permisiuni)[0], init_node())
     return (0, init_node(state0))
 
 # --------------------------------------------------------------------------------------
