@@ -418,7 +418,7 @@ def select_action(node, c, profi, sali, permisiuni):
                 for profesor in profi:
                     for materie in profi[profesor]['Materii']:
                         if (zi, interval, sala) not in node[ACTIONS]:
-                            if profesor in sali[sala]['Profesori'] and materie in sali[sala]['Materii']:
+                            if materie in profi[profesor]['Materii'] and materie in sali[sala]['Materii']:
                                 if zi in permisiuni[profesor]['zile_ok'] and interval in permisiuni[profesor]['ore_ok']:
                                     # Calculăm scorul UCT pentru acțiune
                                     explorare = c * sqrt(2 * log(N_node) / node[N])
@@ -431,25 +431,11 @@ def select_action(node, c, profi, sali, permisiuni):
 
 def mcts(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, materii, permisiuni):
     '''
-    Algoritmul MCTS (UCT).
-
-    Args:
-    - state0: Starea inițială pentru care trebuie aleasă o acțiune.
-    - budget: Numărul de iterații permise.
-    - tree: Arborele din explorările anterioare, dacă există.
-    - opponent_s_action: Ultima acțiune a adversarului, dacă există.
-    - zile: Lista cu zilele săptămânii.
-    - intervale: Lista cu intervalele orare disponibile.
-    - sali: Dicționarul cu informații despre săli.
-    - profi: Dicționarul cu informații despre profesori.
-    - materii: Lista cu materiile disponibile.
-    - permisiuni: Dicționarul cu permisiuni pentru ore și zile pentru fiecare profesor.
-
-    Returns:
-    - Acțiunea (mutarea) selectată și noul nod al arborelui.
+    
     '''
 
     if tree is not None and opponent_s_action in tree[ACTIONS]:
+        #  tree[ACTIONS] este un vector de mutari posibile, opponent action cred ca indicele unei mutari???
         tree = tree[ACTIONS][opponent_s_action]
     else:
         tree = init_node(__init_state__(zile, intervale, sali)) 
@@ -463,34 +449,33 @@ def mcts(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, 
             if not all(mutare in node[ACTIONS] for mutare in posibilitati):
                 break
             mutare_noua = select_action(node, CP, profi, sali, permisiuni)
-            node = node[ACTIONS].get(mutare_noua, None)
-            state = __aply_move__(mutare_noua, state)
+            node = node[ACTIONS].get(mutare_noua, None) # node[ACTIONS] sunt mutari
+            unde = __aply_move__(mutare_noua, state) # intoarce locul in orar unde a pus-o
 
-        if not is_final(state) and get_aviable_actions(state, profi, sali, zile, intervale, materii, permisiuni):
-            mutare_noua = choice(get_aviable_actions(state, profi, sali, zile, intervale, materii, permisiuni))
-            state = __aply_move__(mutare_noua, state)
+        if not is_final(state) and __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni):
+            mutare_noua = choice(__get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni))
+            undee = __aply_move__(mutare_noua, state)
             nod_nou = init_node(state, node)
             if nod_nou:
                 node[ACTIONS][mutare_noua] = nod_nou
                 nod_nou[PARENT] = node
         
         while not is_final(state):
-            mutare = choice(get_aviable_actions(state, profi, sali, zile, intervale, materii, permisiuni))
-            state = __aply_move__(mutare, state)
+            whetever = []
+            whatever = __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)
+            if whatever != []:
+                mutare = choice(whatever)
+                undeeee = __aply_move__(mutare, state)
         
         winner = is_final(state)
-        if winner == state0[NEXT_PLAYER]:
+        if winner == True:
             reward = 1
-        elif winner == (3 - state0[NEXT_PLAYER]):
-            reward = 0.0
-        elif winner == 3:
-            reward = 0.25
         else:
             reward = 0.5
 
         while node:
             node[N] += 1
-            if state0[NEXT_PLAYER] == node[STATE][NEXT_PLAYER]:
+            if state0 == node[STATE]:
                 node[Q] += reward
             else:
                 node[Q] += (1 - reward)
@@ -500,10 +485,11 @@ def mcts(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, 
         final_action = select_action(tree, 0.0, profi, sali, permisiuni)
         return (final_action, tree[ACTIONS][final_action])
 
-    if get_aviable_actions(state0, profi, sali, zile, intervale, materii, permisiuni):
-        return (choice(get_aviable_actions(state0, profi, sali, zile, intervale, materii, permisiuni)), init_node(state0))
+    if __get_aviable_actions__(state0, profi, sali, zile, intervale, materii, permisiuni):
+        return (choice(__get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)), init_node(state0))
 
     return (0, init_node(state0))
+
 
 # --------------------------------------------------------------------------------------
 # main
@@ -572,5 +558,8 @@ if __name__ == "__main__":
         # state = hill_climbing(test, longer2, profi, permisiuni, cobai, sys.maxsize)
         state = hill_climbing1(test, profi, permisiuni, sys.maxsize,sali, zile, intervale, materii)
         print(pretty_print_timetable(state, filename))
-    # if ok == 2:
+    if ok == 2:
+        (action, tree) = mcts(test, 11, None, None, zile, intervale, sali, profi, materii, permisiuni)
+        print(action)
+        if tree: print_tree(tree[PARENT])
         
