@@ -56,8 +56,15 @@ def __get_teach_poate__(profi):
     for i in profi:
         ore_ok = []
         zile_ok = []
+        fereastra = 0
         teach[i] = {}
         for j in profi[i]['Constrangeri']:
+            if isinstance(j, str) and '!Pauza' in j:
+                # Split the string based on whitespace
+                parts = j.split()
+                number_part = parts[-1]
+                numberr = int(''.join(filter(str.isdigit, number_part)))
+                fereastra = numberr
             e_ora = 0
             if '!' not in j:
                 for char in j:
@@ -77,6 +84,7 @@ def __get_teach_poate__(profi):
                     zile_ok.append(j)
                 teach[i]['ore_ok'] = ore_ok
                 teach[i]['zile_ok'] = zile_ok
+                teach[i]['fereastra'] = fereastra
     return teach
 # --------------------------------------------------------------------------------------
 # generators of parts for timetable generator
@@ -148,6 +156,86 @@ def __get_aviable_actions__(state, profi, sali, zile, intervale, materii, poate)
                                                         overlap = True
                                                         break
                                             if not overlap:
+                                                dummy = (day, hours, room, t, sub)
+                                                actions.append(dummy)
+    return actions
+
+def __get_teach_total__(state, profi, teacher):
+    nr = 0
+    if state is not None and state != {}:
+        for day in state:
+            if state[day] is not None and state[day] != {}:
+                for hour in state[day]:
+                    if state[day][hour] is not None and state[day][hour] != {}:
+                        for room in state[day][hour]:
+                            if state[day][hour][room] is not None and state[day][hour][room] != () and len(state[day][hour][room]) >= 2:
+                                if state[day][hour][room][0] == teacher:
+                                    nr += 1
+    return nr
+
+def get_difference(state, move):
+    diff1 = 0
+    diff2 = 0
+    diff = 0
+    if state is not None and state != {}:
+        for day in state:
+            if state[day] is not None and state[day] != {}:
+                for hour in state[day]:
+                    if hour[1] >= move[1][0]:
+                        if state[day][hour] is not None and state[day][hour] != {}:
+                            for room in state[day][hour]:
+                                if state[day][hour][room] is not None and state[day][hour][room] != () and len(state[day][hour][room]) >= 2:
+                                    if state[day][hour][room][0] == move[3]:
+                                        diff1 = hour[0] - move[1][1]
+                                        break
+                    if hour[0] <= move[1][1]:
+                        if state[day][hour] is not None and state[day][hour] != {}:
+                            for room in state[day][hour]:
+                                if state[day][hour][room] is not None and state[day][hour][room] != () and len(state[day][hour][room]) >= 2:
+                                    if state[day][hour][room][0] == move[3]:
+                                        diff2 = move[1][1] = hour[0]
+                                        break
+    diff = diff1 + diff2
+    return diff
+
+def __get_aviable_actions1__(state, profi, sali, zile, intervale, materii, poate, fer):
+    ''' 
+    Generates all possible actions from the lists of days, intervals, teachers
+    in order to satisfact the constraints of days, intervals 
+    and their own subjects with rooms for each subject for teachers
+    Bullets 2, 5, 6 from hard constraints
+    '''
+    actions = []
+    for day in zile:
+        for hours in intervale:
+            for room in sali:
+                for t in profi:
+                    not_ok = True
+                    notok = True
+                    for sub in materii:
+                        if state[day][hours][room] == ():
+                            if sub in profi[t]['Materii']: # proful preda materia aia
+                                if sub in sali[room]['Materii']: # materia se face in sala aia
+                                    if day in permisiuni[t]['zile_ok']: # proful poate in ziua aia
+                                        if hours in permisiuni[t]['ore_ok']: # proful poate preda in orele alea
+                                            overlap = False
+                                            dumm = None
+                                            for room2 in sali:
+                                                if room2 != room:
+                                                    if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
+                                                        overlap = True # verific sa nu fie aceeasi persoana in doua locuri diferite in acelasi timp
+                                                        break
+                                            nr = __get_teach_total__(state, profi, t)
+                                            dumm = (day, hours, room, t, sub)
+                                            diff = get_difference(state, dumm)
+                                            if permisiuni[t]['fereastra'] is not None:
+                                                if diff > permisiuni[t]['fereastra']: # verific fereastra
+                                                    notok = False
+                                            else:
+                                                notok = True
+                                            if nr > 7: # verific sa nu fie mai mult de 7 intervale de persoana
+                                                not_ok = False
+                                            if not overlap and not not_ok and not notok:
                                                 dummy = (day, hours, room, t, sub)
                                                 actions.append(dummy)
     return actions
