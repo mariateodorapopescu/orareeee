@@ -384,27 +384,26 @@ def hill_climbing1(initial_state, profi, permisiuni, max_iters, sali, zile, inte
     return best_state
 # --------------------------------------------------------------------------------------
 # mcts
-def print_tree(tree, indent = 0):
-    if not tree:
-        return
-    tab = "".join(" " * indent)
-    print("%sN = %d, Q = %f" % (tab, tree[N], tree[Q]))
-    for a in tree[ACTIONS]:
-        print("%s %d ==> " % (tab, a))
-        print_tree(tree[ACTIONS][a], indent + 3) 
-        # ??? probabil o sa scap de ea, vedem
+# def print_tree(tree, indent = 0):
+#     if not tree:
+#         return
+#     tab = "".join(" " * indent)
+#     print("%sN = %d, 'Q' = %f" % (tab, tree['N'], tree['Q']))
+#     for a in tree['ACTIONS']:
+#         print("%s %d ==> " % (tab, a))
+#         print_tree(tree['ACTIONS'][a], indent + 3) 
+#         # ??? probabil o sa scap de ea, vedem
                  
 def init_node(state, parent):
     '''
-    I do not use classes, ok? So, the node and the tree ar as they are in the laboratory, 
-    the tree is a dictonary with the state being the timetable aka 
-    {day:{hours:{room: (teacher, subject)}}} and parent a timetable 
-    from where STATE was generated / previous state aka the old version before 
-    a move was made and with that move the timetable is the one I have right now.
-    Actions is as it is in the lab state -> next-state
+    Initializes a new node for the Monte Carlo Tree Search algorithm.
+    Args:
+    - state: The state represented by the node.
+    - parent: The parent node of the current node.
+    Returns:
+    - The initialized node.
     '''
-    return {N: 0, Q: 0, STATE: state, PARENT: parent, ACTIONS: {}}
-    #  asta e gen nodul radacina
+    return {'N': 0, 'Q': 0, 'STATE': state, 'PARENT': parent, 'ACTIONS': {}}
 
 def select_action(node, c, profi, sali, permisiuni):
     '''
@@ -418,26 +417,26 @@ def select_action(node, c, profi, sali, permisiuni):
     Returns:
     - Mutarea optimă (zi, interval, sală, profesor, materie).
     ------------------------------------------------------------------------------------
-    A, gata. node[ACTIONS] e un dictionar in care e pusa o mutare 
+    A, gata. node['ACTIONS'] e un dictionar in care e pusa o mutare 
     si gen urmatoarea chestie e un nod cu orarul rezultat cu mutarea aia 
     (desi mai simplu era daca era numai un nou orar si atat -> e si aai o varianta)
     '''
 
-    N_node = node[N]
+    N_node = node['N']
 
     mutare_optima = None
     max_scor = float('-inf')
     mutare_optima = None
 
-    for mutare, nod in node[ACTIONS].items():
-        if nod[N] == 0: # asta da
+    for mutare, nod in node['ACTIONS'].items():
+        if  node.get('N', 0) == 0: # asta da
             scor = float('inf')
         else:
-            expandare = nod[Q] / nod[N] # ok, 
+            expandare = node.get('Q', 0) /  node.get('N', 0) # ok, 
             # ia gen nodul curent, state ul curent din nodul dat ca parametru 
             # si face calcule pe el
-            explorare = c * sqrt(2 * log(N_node) / nod[N]) # okkk
-            nconflicts = __get_all_conflicts__(nod[STATE], profi, permisiuni) 
+            explorare = c * sqrt(2 * log(N_node) /  node.get('N', 0)) # okkk
+            nconflicts = __get_all_conflicts__(nod['STATE'], profi, permisiuni) 
             # o sa pun in calcul si constraint-uri
             scor = expandare + explorare + nconflicts # oook
         if mutare_optima is None or scor < max_scor: 
@@ -450,100 +449,68 @@ def select_action(node, c, profi, sali, permisiuni):
     return mutare_optima
 
 def mcts(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, materii, permisiuni, c):
-    '''
-    Algoritmul MCTS (UCT)
-    state0 - tabelul pentru care trebuie aleasă o acțiune/mutare/tuplu
-    budget - numărul de iterații permis -> 10000 mainly, dat in main
-    tree - un arbore din explorările anterioare, dacă există
-    opponent_s_action - n-am mai modificat denumirea din lab, 
-    dar asta e starea/tabelul precedent dacă există
-    opponent_action = ORAR_VECHI, STARE_ANTERIOARA
-    '''
     # DACĂ există un arbore construit anterior ȘI
-    #   acesta are un copil ce corespunde starii anterioare,
+    # acesta are un copil ce corespunde starii anterioare,
     # ATUNCI acel copil va deveni nodul de început pentru algoritm.
     # ALTFEL, arborele de start este un nod gol.
-    
-    if tree is not None and opponent_s_action in tree[ACTIONS]:
-        tree = tree[ACTIONS][opponent_s_action]
+    if tree is not None and opponent_s_action in tree['ACTIONS']:
+        tree = tree['ACTIONS'][opponent_s_action]
     else:
-        tree = init_node(__init_state__(zile, intervale, sali), None) # asta se lasa asa ca e algoritmul de generare in sine, 
-        # chestia ce se modifica cred ca are loc mai sus, la select action
+        tree = init_node(__init_state__(zile, intervale, sali), None)
 
-    #---------------------------------------------------------------
-       
     for _ in range(budget):
-        # Pornim procesul de selecție din nodul rădăcină / starea inițială
-        # buget vine un fel de max_iter din hill_climbing
         node = tree
-        state = state0
-        # TODO <4>
+        state = deepcopy(state0)
+
         # Coborâm în arbore până când ajungem la o stare finală
         # sau la un nod cu acțiuni neexplorate.
-
         while not is_final(state):
-            posibilitati = __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)
-            if not all(mutare in node[ACTIONS] for mutare in posibilitati):
+            new_state = deepcopy(node['STATE'])
+            posibilitati = __get_aviable_actions__(new_state, profi, sali, zile, intervale, materii, permisiuni)
+            if not all(mutare in node['ACTIONS'] for mutare in posibilitati):
                 break
             mutare_noua = select_action(node, c, profi, sali, permisiuni)
-            node = node[ACTIONS][mutare_noua]
-            unde = __aply_move__(mutare_noua, state)
+            new_state = __aply_move__(mutare_noua, new_state)
+            node['ACTIONS'][mutare_noua] = new_state
+            node = node['ACTIONS'][mutare_noua]
 
-        #---------------------------------------------------------------
-
-        # TODO <5>
         # Dacă am ajuns într-un nod care nu este final și din care nu s-au
         # `încercat` toate acțiunile, construim un nod nou.
-        isok = __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)
-        if not is_final(state) and isok is not None: 
-            # alea de mai de sus se recicleaza pentru a  putea trece mai departe
-            alta_mutare_noua = choice(isok) # se recicleaza ca merge pana la 2 nivele in arb
-            undee = __aply_move__(alta_mutare_noua, state)
-            mutare_nouaa = select_action(node, c, profi, sali, permisiuni)
-            nodd = node[ACTIONS].get(mutare_nouaa)
-            if state is not None and mutare_nouaa is not None:
-                undeee = __aply_move__(mutare_nouaa, state)
-                # aici se fac legaturile, ca sa se treaca mai departe
-                # nod_nou[PARENT] = node # pune head-ul current ca parinte
-                # dar asta cu node[PARENT] am facut-o deja
-                # e gen ca si cum ai adauga un nod nod intr-o liste, ca la liste inlantuite
+        isok = __get_aviable_actions__(new_state, profi, sali, zile, intervale, materii, permisiuni)
+        if not is_final(new_state) and isok is not None: 
+            index = randint(0, len(isok) - 1)
+            alta_mutare_noua = isok[index]
+            ceva = __aply_move__(alta_mutare_noua, new_state)
+            node['ACTIONS'][alta_mutare_noua] = new_state
+            node = node['ACTIONS'][alta_mutare_noua]
 
-        #---------------------------------------------------------------
-
-        # TODO <6>
         # Se simulează o desfășurare a jocului până la ajungerea într-o
         # starea finală. Se evaluează recompensa în acea stare.
-        # state = state0 # de înlocuit cu node[STATE]
-        while not is_final(state):
-            posibilitati = __get_aviable_actions__(state, profi, sali, zile, intervale, materii, permisiuni)
-            mutare = choice(posibilitati) # asta e un rand index
-            state = __aply_move__(mutare, state)
-            # break
+        while not is_final(new_state) and posibilitati != [] and posibilitati is not None:
+            posibilitati = __get_aviable_actions__(new_state, profi, sali, zile, intervale, materii, permisiuni)
+            if posibilitati != [] and posibilitati is not None:
+                indexx = randint(0, len(posibilitati) - 1)
+                mutare = posibilitati[indexx]
+                undeeee = __aply_move__(mutare, new_state)
 
-        #---------------------------------------------------------------
-
-        # TODO <7>
         # Se actualizează toate nodurile de la node către rădăcină:
-        #  - se incrementează valoarea N din fiecare nod
-        #  - pentru nodurile corespunzătoare acestui jucător, se adună recompensa la valoarea Q
-        #  - pentru nodurile celelalte, valoarea Q se adună 1 cu minus recompensa
+        #  - se incrementează valoarea 'N' din fiecare nod
+        #  - pentru nodurile corespunzătoare acestui jucător, se adună recompensa la valoarea 'Q'
+        #  - pentru nodurile celelalte, valoarea 'Q' se adună 1 cu minus recompensa
         while node:
-            node[N] += 1
-            if state0 == node[STATE]:         
-                node[Q] = node[Q] + __get_capacity_conflicts__(node[STATE])
-            else:
-                node[Q] += (1 -  __get_capacity_conflicts__(node[STATE]))
-            node = node[PARENT]
-        #---------------------------------------------------------------
+            if node:
+                node['N'] = node.get('N', 0) + 1
+                if state0 == node.get('STATE', 0):
+                    node['Q'] = node.get('Q', 0) + 1  # Adjust this based on your reward calculation
+                else:
+                    node['Q'] = node.get('Q', 0) - 1  # Adjust this based on your reward calculation
+                    node = node.get('PARENT', 0)
 
     if tree:
-        final_action = select_action(tree, 0.0, profi, sali, permisiuni)
-        return (final_action, tree[ACTIONS][final_action])
-    # Acest cod este aici doar ca să nu dea erori testele mai jos; în mod normal tree nu trebuie să fie None
-    if __get_aviable_actions__(state0, profi, sali, zile, intervale, materii, permisiuni):
-        return (__get_aviable_actions__(state0, profi, sali, zile, intervale, materii, permisiuni)[0], init_node())
-    
-    return (0, init_node(state0))
+        final_action = select_action(tree, c, profi, sali, permisiuni)
+        return (final_action, tree['ACTIONS'][final_action])
+
+    return (0, init_node(state0, None))
 
 # --------------------------------------------------------------------------------------
 # main
@@ -597,12 +564,6 @@ if __name__ == "__main__":
     # array with (day, interval, room, teacher, course) tuples
     longer2 = __generate_actions123__(profi, sali, zile, intervale)
     
-    N = 'N'
-    Q = 'Q'
-    STATE = 'STATE'
-    PARENT = 'PARENT'
-    ACTIONS = 'ACTIONS'
-    
     # constanta care reglează raportul între explorare și exploatare (CP = 0 -> doar exploatare)
     CP = 1.0 / sqrt(2.0)
     
@@ -613,6 +574,17 @@ if __name__ == "__main__":
         state = hill_climbing1(test, profi, permisiuni, sys.maxsize,sali, zile, intervale, materii)
         print(pretty_print_timetable(state, filename))
     if ok == 2:
-        (action, tree) = mcts(test, 11, None, None, zile, intervale, sali, profi, materii, permisiuni, CP)
-        print(action)
-        if tree: print_tree(tree[PARENT])
+        cv, tree = mcts(test, 11, None, None, zile, intervale, sali, profi, materii, permisiuni, CP)
+        # if tree: print(enumerate(tree.values())[0])
+        orar = {}
+        if 'Luni' in tree:
+            orar['Luni'] = tree['Luni']
+        if 'Marti' in tree:
+            orar['Marti'] = tree['Marti']
+        if 'Miercuri' in tree:
+            orar['Miercuri'] = tree['Miercuri']
+        if 'Joi' in tree:
+            orar['Joi'] = tree['Joi']
+        if 'Vineri' in tree:
+            orar['Vineri'] = tree['Vineri']
+        print(pretty_print_timetable(orar, filename))
