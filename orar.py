@@ -288,6 +288,15 @@ def get_min_sub(materii):
             minii = sub
     return minii
 
+def get_max_sub(materii):
+    mini = 0
+    minii = None
+    for sub in materii:
+        if mini < materii[sub]:
+            mini = materii[sub]
+            minii = sub
+    return minii
+
 def acoperit_minim(state, materii, sali):
     ok = False
     mat = get_min_sub(materii)
@@ -310,17 +319,29 @@ def get_total_students(materii, min_subject):
             total_students += nr_stud
     return total_students
 
+def all_subjects_fulfilled(state, materii, sali):
+    total_students = {subject: 0 for subject in materii}
+    for day in state:
+        for hours in state[day]:
+            for room in state[day][hours]:
+                if state[day][hours][room] is not None and state[day][hours][room] != () and len(state[day][hours][room]) >= 2:
+                    subject = state[day][hours][room][1]
+                    total_students[subject] += sali[room]['Capacitate']
+    for subject, required_students in materii.items():
+        if total_students[subject] < required_students:
+            return False
+    return True
+
 def __get_aviable_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
     actions = []
-    materii_sortate = dict(sorted(materii.items(), key=lambda x: x[1]))
-    min_subject = get_min_sub(materii)
-    total_students_min_subject = get_total_students(materii, min_subject)
+    min_subject = max(materii, key=materii.get)
+    total_students_min_subject = materii[min_subject]
     for day in zile:
         for hours in intervale:
             for room in sali:
                 for t in profi:
                     if donee(state, t):  
-                        for sub in materii_sortate:
+                        for sub in materii:
                             if state[day][hours][room] == ():
                                 if sub in profi[t]['Materii']:  
                                     if sub in sali[room]['Materii']:  
