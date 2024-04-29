@@ -9,7 +9,7 @@ import numpy as np
 from utils import pretty_print_timetable
 from random import shuffle, seed, randint
 import random
-from math import sqrt, log
+from math import sqrt, log, ceil, floor
 # imports
 # --------------------------------------------------------------------------------------
 # initialize things
@@ -47,8 +47,8 @@ def __init_cobai__(zile, intervale, sali):
 # getters
 def __get_teach_poate__(profi):
     '''
-    Genereates all the intervals in which a teacher can teach \n
-    Soft constraints, we'll fix it later \n
+    Generates all the intervals in which a teacher can teach
+    Soft constraints, we'll fix it later
     First we have to deal with the hard/logistical ones
     Bullets 1, 2, 3 from soft constraints
     '''
@@ -67,10 +67,12 @@ def __get_teach_poate__(profi):
                 if e_ora:
                     start, end = map(int, j.split('-'))
                     if (end - start) > 2:
-                        for ore in range(start, end-2, 2):
+                        for ore in range(start, end, 2):
                             endd = ore + 2
                             interv = (ore, endd)
                             ore_ok.append(interv)
+                        if end % 2 != 0:
+                            ore_ok.append((end - 2, end))  # Add the last interval if it's not complete
                     else:
                         ore_ok.append((start, end))
                 else:
@@ -78,6 +80,7 @@ def __get_teach_poate__(profi):
                 teach[i]['ore_ok'] = ore_ok
                 teach[i]['zile_ok'] = zile_ok
     return teach
+
 # --------------------------------------------------------------------------------------
 # generators of parts for timetable generator
 def __generate_actions12__(profi, sali, zile, intervale):
@@ -152,6 +155,49 @@ def __get_aviable_actions__(state, profi, sali, zile, intervale, materii, poate)
                                                 actions.append(dummy)
     return actions
 
+def __get_aviable_actions2__(state, profi, sali, zile, intervale, materii, permisiuni):
+    actions = []
+    v_profi = {prof: 0 for prof in profi}  # Dictionary to track the number of intervals for each teacher
+    v_cap = {mat: 0 for mat in materii}  # Dictionary to track the total capacity assigned for each subject
+    remaining_students = {mat: materii[mat] for mat in materii}  # Dictionary to track remaining students for each subject
+    # Sort subjects by the number of remaining students (from least to most)
+    sorted_subjects = sorted(remaining_students, key=remaining_students.get)
+    # Shuffle the intervals to randomize their order
+    shuffled_intervals = random.sample(intervale, len(intervale))
+    for sub in sorted_subjects:
+        for room in sali:
+            for t in profi:
+                for day in zile:
+                    for hours in shuffled_intervals:  # Iterate through shuffled intervals
+                        if state[day][hours][room] == ():  # Check if room is free at this time
+                            if sub in profi[t]['Materii'] and sub in sali[room]['Materii']:
+                                if day in permisiuni[t]['zile_ok'] and hours in permisiuni[t]['ore_ok']:
+                                    overlap = False
+                                    for room2 in sali:
+                                        if room2 != room and state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
+                                            overlap = True
+                                            break
+                                    if not overlap:
+                                        capacity_to_assign = min(sali[room]['Capacitate'], remaining_students[sub])  # Assign minimum of room capacity and remaining students
+                                        v_cap[sub] += capacity_to_assign
+                                        v_profi[t] += 1
+                                        actions.append((day, hours, room, t, sub))
+                                        state[day][hours][room] = (t, sub)  # Assign teacher and subject to the room
+                                        remaining_students[sub] -= capacity_to_assign  # Update remaining students for the subject
+                                        if remaining_students[sub] == 0:  # Check if all students for the subject are assigned
+                                            break  # Exit the hours loop
+                    if remaining_students[sub] == 0:  # Check if all students for the subject are assigned
+                        break  # Exit the days loop
+                if remaining_students[sub] == 0:  # Check if all students for the subject are assigned
+                    break  # Exit the teachers loop
+                if v_profi[t] > 7:  # Check if teacher has more than 7 intervals
+                    break  # Exit the teachers loop
+            if remaining_students[sub] == 0:  # Check if all students for the subject are assigned
+                break  # Exit the room loop
+        if remaining_students[sub] == 0:  # Check if all students for the subject are assigned
+            break  # Exit the subject loop
+    return actions
+
 def __get_teach_total__(state, teacher):
     nr = 0
     if state:
@@ -173,43 +219,86 @@ def _get_teach_total_(state, teacher):
                     count += 1
     return count
 
-def _get_aviable_actions12_(state, profi, sali, zile, intervale, materii, permisiuni):
-    actions = []
-    v_profi = {}
-    v_cap  = {}
-    for prof in profi:
-        v_profi[prof] = 0
-    for mat in materii:
-        v_cap[mat] = 0
-    for sub in materii:
-        for room in sali:
-            for t in profi:
-                for day in zile:
-                    for hours in intervale:
-                        if state[day][hours][room] == ():  # Check if room is free at this time
-                            if sub in profi[t]['Materii'] and sub in sali[room]['Materii']:
-                                if day in permisiuni[t]['zile_ok'] and hours in permisiuni[t]['ore_ok']:
-                                    overlap = False
-                                    for room2 in sali:
-                                        if room2 != room and state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
-                                            overlap = True
-                                            break
-                                    if not overlap:
-                                        v_cap[sub] += sali[room]['Capacitate']
-                                        v_profi[t] += 1
-                                        actions.append((day, hours, room, t, sub))
-                                        if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
-                                            break  # Exit the hours loop
-                    if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
-                        break  # Exit the days loop
-                if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
-                    break  # Exit the teachers loop
-                if v_profi[t] > 7:  # Check if teacher has more then 7 intrevals
-                    break  # Exit the teachers loop
-            if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
-                break # Exit room loop
-    return actions
+from math import ceil
 
+def __get_min_max_room_sub__(sali, materii):
+    dictt = {}
+    for mat in materii:
+        dictt[mat] = {}
+        mini = 9999
+        maxi = 0
+        for room in sali:
+            if mat in sali[room]['Materii']:
+                if mini > sali[room]['Capacitate']:
+                    mini = sali[room]['Capacitate']
+                if maxi < sali[room]['Capacitate']:
+                    maxi = sali[room]['Capacitate']
+        dictt[mat]['Min'] = ceil(materii[mat] / maxi)
+        dictt[mat]['Max'] = ceil(materii[mat] / mini)
+    return dictt
+
+def __get_nr_subs__(state, sub):
+    nr = 0
+    for day in state:
+        for hours in state[day]:
+            for room in state[day][hours]:
+                if state[day][hours][room] is not None and state[day][hours][room] != () and len(
+                        state[day][hours][room]) >= 2:
+                    if state[day][hours][room][1] == sub:
+                        nr += 1
+    return nr
+
+def gata(state, sub, room, materii):
+    dictt = __get_min_max_room_sub__(room, materii)
+    return __get_nr_subs__(state, sub) >= dictt[sub]['Min']
+
+def get_nr_hours(state, prof):
+    nr = 0
+    for day in state:
+        for hours in state[day]:
+            for room in state[day][hours]:
+                if state[day][hours][room] is not None and state[day][hours][room] != () and len(
+                        state[day][hours][room]) >= 2:
+                    if state[day][hours][room][0] == prof:
+                        nr += 1
+    return nr
+
+def donee(state, prof):
+    return get_nr_hours(state, prof) <= 7
+
+def  __get_aviable_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
+    ''' 
+    Generates all possible actions from the lists of days, intervals, teachers
+    in order to satisfact the constraints of days, intervals 
+    and their own subjects with rooms for each subject for teachers
+    Bullets 2, 5, 6 from hard constraints
+    '''
+    actions = []
+    for day in zile:
+        for hours in intervale:
+            for room in sali:
+                for t in profi:
+                    # print("ore ok si zile ok prof:" + t + ":" + str(list(permisiuni[t]['ore_ok'])) + "-" + str(list(permisiuni[t]['zile_ok'])))
+                    if donee(state, t):  # Check if teacher has less than or equal to 7 intervals
+                        for sub in materii:
+                            if state[day][hours][room] == ():
+                                if sub in profi[t]['Materii']:  # Check if teacher teaches this subject
+                                    if sub in sali[room]['Materii']:  # Check if subject can be taught in this room
+                                        if day in permisiuni[t]['zile_ok']:  # Check if teacher is available on this day
+                                            if hours in permisiuni[t]['ore_ok']:  # Check if teacher is available at this hour
+                                                if not gata(state, sub, sali, materii):  # Check if subject needs more rooms
+                                                    overlap = False
+                                                    for room2 in sali:
+                                                        if room2 != room:
+                                                            if state[day][hours][room2] != () and len(
+                                                                    state[day][hours][room2]) >= 1 and \
+                                                                    state[day][hours][room2][0] == t:
+                                                                overlap = True  # Check if same teacher is teaching in another room
+                                                                break
+                                                    if not overlap:
+                                                        dummy = (day, hours, room, t, sub)
+                                                        actions.append(dummy)
+    return actions
 
 def __generate_actions1__(profi, sali, zile, intervale):
     ''' 
@@ -452,8 +541,9 @@ def hill_climbing12(initial_state, profi, permisiuni, max_iters, sali, zile, int
     best_state = deepcopy(current_state)
     for _ in range(max_iters):
         current_conflicts = __get_all_conflicts__(current_state, profi, permisiuni)
-        okok = _get_aviable_actions12_(current_state, profi, sali, zile, intervale, materii, permisiuni)
-        if okok == []:
+        okok = __get_aviable_actions1__(current_state, profi, sali, zile, intervale, materii, permisiuni)
+        # print(okok)
+        if okok == [] or okok is None:
             break
         index = randint(0, len(okok) - 1)
         action = okok[index]
