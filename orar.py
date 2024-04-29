@@ -5,6 +5,7 @@ from copy import deepcopy
 from utils import pretty_print_timetable
 from random import randint
 from math import sqrt, log, ceil
+import time
 # imports
 # --------------------------------------------------------------------------------------
 # initialize things
@@ -491,49 +492,48 @@ def __hill_climbing__(initial_state, teachers, permissions, max_iters, rooms, da
     return best_state
 
 # --------------------------------------------------------------------------------------
-# mcts          
-def init_node(state, parent):
+# mcts
+def __get_available_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
+    ''' 
+    Generates all possible actions from the lists of days, intervals, teachers
+    in order to satisfact the constraints of days, intervals 
+    and their own subjects with rooms for each subject for teachers
+    Bullets 2, 5, 6 from hard constraints
     '''
-    Initializes a new node for the Monte Carlo Tree Search algorithm.\n
-    Args:\n
-    - state - {string: {(int, int): {string: (string, string)}}} with the timetable with 
-    {day: {(start, end): {room: (teacher, course)}}}\n
-    - node {'N': number of iters, 'Q': quality/score, 'STATE': timetable/state(up), 'PARENT': parent node with previous state, 'ACTIONS': {nodes with next states}}\n
-        - node['ACTIONS'] = {move: next node with next state after that move}
+    actions = []
+    for day in zile:
+        for hours in intervale:
+            for room in sali:
+                for t in profi:
+                    for sub in materii:
+                        if state[day][hours][room] == ():
+                            if sub in profi[t]['Materii']: # proful preda materia aia
+                                if sub in sali[room]['Materii']: # materia se face in sala aia
+                                    if day in permisiuni[t]['days_ok']: # proful poate in ziua aia
+                                        if hours in permisiuni[t]['good_intervals']: # proful poate preda in orele alea
+                                            overlap = False
+                                            for room2 in sali:
+                                                if room2 != room:
+                                                    if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
+                                                        overlap = True
+                                                        break
+                                            if not overlap:
+                                                dummy = (day, hours, room, t, sub)
+                                                actions.append(dummy)
+    return actions
+                 
+def __init_node__(state, parent):
+    '''
+    Initializes a new node for the Monte Carlo Tree Search algorithm.
+    Args:
+    - state: The state represented by the node.
+    - parent: The parent node of the current node.
+    Returns:
+    - The initialized node.
     '''
     return {'N': 0, 'Q': 0, 'STATE': state, 'PARENT': parent, 'ACTIONS': {}}
 
-def __select_action__(node, c, teachers, rooms, permissions):
-    '''
-    Selects the best move to put in the timetable -> taken from the laboratory\n
-    Args:\n
-    - node {'N': number of iters, 'Q': quality/score, 'STATE': timetable/state(up), 'PARENT': parent node with previous state, 'ACTIONS': {nodes with next states}}\n
-        - node['ACTIONS'] = {move: next node with next state after that move}\n
-    - c - float - constant\n
-    - rooms - {string:{'Materii': , 'Capacitate': }} with room names and numbers\n
-    - teachers - {string: {'Materii': [string], 'Constrangeri': }} 
-        - what teachers are there, what they teach and their preferences\n
-    - permissions - [(string, (int, int), string, string, string)] - [(day, interval, room, teacher, subject)] 
-        - array with all possible moves to put in the timetable
-    '''
-    N_node = node['N']
-    mutare_optima = None
-    max_scor = float('-inf')
-    mutare_optima = None
-    for mutare, nod in node['ACTIONS'].items():
-        if  node.get('N', 0) == 0:
-            scor = float('inf')
-        else:
-            expandare = node.get('Q', 0) /  node.get('N', 0)
-            explorare = c * sqrt(2 * log(N_node) /  node.get('N', 0))
-            nconflicts = __get_all_conflicts__(nod['STATE'], teachers, permissions) 
-            scor = expandare + explorare + nconflicts
-        if mutare_optima is None or scor < max_scor: 
-            mutare_optima = mutare
-            max_scor = scor
-    return mutare_optima
-
-def __mcts__(state0, budget, tree, opponent_s_action, days, intervals, rooms, teachers, courses, permissions, c):
+def __select_action__(node, c, profi, sali, permisiuni):
     '''
     Implements a monte carlo tree search algorithm to optimize a schedule by reducing conflicts.\n
     Args:\n
@@ -553,35 +553,61 @@ def __mcts__(state0, budget, tree, opponent_s_action, days, intervals, rooms, te
         - array with all possible moves to put in the timetable
     - buget - int - how many times to try to generate a new timetable from 0
     '''
+
+    N_node = node['N']
+
+    mutare_optima = None
+    max_scor = float('-inf')
+    mutare_optima = None
+
+    for mutare, nod in node['ACTIONS'].items():
+        if  node.get('N', 0) == 0: # asta da
+            scor = float('inf')
+        else:
+            expandare = node.get('Q', 0) /  node.get('N', 0)
+            explorare = c * sqrt(2 * log(N_node) /  node.get('N', 0))
+            nconflicts = __get_all_conflicts__(nod['STATE'], profi, permisiuni) 
+            scor = expandare + explorare + nconflicts
+        if mutare_optima is None or scor < max_scor: 
+            mutare_optima = mutare 
+            max_scor = scor
+    return mutare_optima
+
+def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, materii, permisiuni, c):
     if tree is not None and opponent_s_action in tree['ACTIONS']:
         tree = tree['ACTIONS'][opponent_s_action]
     else:
-        tree = init_node(__init_state__(days, intervals, rooms), None)
+        tree = __init_node__(__init_state__(zile, intervale, sali), None)
+
     for _ in range(budget):
         node = tree
         state = deepcopy(state0)
+
         while not __is_final__(state):
             new_state = deepcopy(node['STATE'])
-            posibilitati = __get_available_actions1__(state, teachers, rooms, days, intervals, courses, permissions)
+            posibilitati = __get_available_actions1__(new_state, profi, sali, zile, intervale, materii, permisiuni)
             if not all(mutare in node['ACTIONS'] for mutare in posibilitati):
                 break
-            mutare_noua = __select_action__(node, c, teachers, rooms, permissions)
+            mutare_noua = __select_action__(node, c, profi, sali, permisiuni)
             new_state = __apply_action__(mutare_noua, new_state)
             node['ACTIONS'][mutare_noua] = new_state
             node = node['ACTIONS'][mutare_noua]
-        isok = __get_available_actions1__(state, teachers, rooms, days, intervals, courses, permissions)
+
+        isok = __get_available_actions1__(new_state, profi, sali, zile, intervale, materii, permisiuni)
         if not __is_final__(new_state) and isok is not None: 
             index = randint(0, len(isok) - 1)
             alta_mutare_noua = isok[index]
             ceva = __apply_action__(alta_mutare_noua, new_state)
             node['ACTIONS'][alta_mutare_noua] = new_state
             node = node['ACTIONS'][alta_mutare_noua]
+            
         while not __is_final__(new_state) and posibilitati != [] and posibilitati is not None:
-            posibilitati = __get_available_actions1__(state, teachers, rooms, days, intervals, courses, permissions)
+            posibilitati = __get_available_actions1__(new_state, profi, sali, zile, intervale, materii, permisiuni)
             if posibilitati != [] and posibilitati is not None:
                 indexx = randint(0, len(posibilitati) - 1)
                 mutare = posibilitati[indexx]
                 undeeee = __apply_action__(mutare, new_state)
+
         while node:
             if node:
                 node['N'] = node.get('N', 0) + 1
@@ -590,13 +616,16 @@ def __mcts__(state0, budget, tree, opponent_s_action, days, intervals, rooms, te
                 else:
                     node['Q'] = node.get('Q', 0) - 1
                     node = node.get('PARENT', 0)
+
     if tree:
-        final_action = __select_action__(tree, c, teachers, rooms, permissions)
+        final_action = __select_action__(tree, c, profi, sali, permisiuni)
         return (final_action, tree['ACTIONS'][final_action])
 
-    return (0, init_node(state0, None))
+    return (0, __init_node__(state0, None))
+
 # --------------------------------------------------------------------------------------
 # main
+start_time = time.time()
 if __name__ == "__main__":
     ok = 0
     if len(sys.argv) < 3:
@@ -639,11 +668,14 @@ if __name__ == "__main__":
     if ok == 1:
         # we populate the timetable with all arrangements
         orar = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
+        end_time1 = time.time()
         # print(__how_many__(orar, courses, rooms))
+        # print(end_time1 - start_time)
         # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar, filename))
     if ok == 2:
         cv, tree = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
+        end_time2 = time.time()
         orar = {}
         if 'Luni' in tree:
             orar['Luni'] = tree['Luni']
@@ -656,5 +688,6 @@ if __name__ == "__main__":
         if 'Vineri' in tree:
             orar['Vineri'] = tree['Vineri']
         # print(__how_many__(orar, courses, rooms))
+        # print(end_time2 - start_time)
         # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar, filename))
