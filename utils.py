@@ -130,8 +130,10 @@ def pretty_print_timetable_aux_zile(timetable : {str : {(int, int) : {str : (str
                     s_interval += allign_string_with_spaces(f'{classroom} - goala', max_len, 'left')
                 else:
                     prof, subject = classes[classroom]
-                    s_interval += allign_string_with_spaces(f'{subject} : ({classroom} - {profs_to_initials[prof]})', max_len, 'left')
-            
+                    if prof is not None:
+                        s_interval += allign_string_with_spaces(f'{subject} : ({classroom} - {profs_to_initials[prof]})', max_len, 'left')
+                    else:
+                        s_interval += allign_string_with_spaces(f'{classroom} - goala', max_len, 'left')
             s_interval += '|\n'
         table_str += s_interval + delim
 

@@ -163,40 +163,53 @@ def __get_teach_total__(state, teacher):
     return nr
 
 
-def __get_aviable_actions1__(state, profi, sali, zile, intervale, materii, poate):
-    ''' 
-    Generates all possible actions from the lists of days, intervals, teachers
-    in order to satisfact the constraints of days, intervals 
-    and their own subjects with rooms for each subject for teachers
-    Bullets 2, 5, 6 from hard constraints
-    '''
+def _get_teach_total_(state, teacher):
+    # This function counts the total number of intervals assigned to a teacher across all days, intervals, and rooms.
+    count = 0
+    for day in state:
+        for hours in state[day]:
+            for room in state[day][hours]:
+                if state[day][hours][room] and state[day][hours][room][0] == teacher:
+                    count += 1
+    return count
+
+def _get_aviable_actions12_(state, profi, sali, zile, intervale, materii, permisiuni):
     actions = []
-    for day in zile:
-        for hours in intervale:
-            for room in sali:
-                for t in profi:
-                    not_ok = True
-                    nr = __get_teach_total__(state, t)
-                    # print(t, nr)
-                    if nr > 7: # verific sa nu fie mai mult de 7 intervale de persoana
-                        not_ok = False
-                        # break
-                    for sub in materii:
-                        if state[day][hours][room] == ():
-                            if sub in profi[t]['Materii']: # proful preda materia aia
-                                if sub in sali[room]['Materii']: # materia se face in sala aia
-                                    if day in permisiuni[t]['zile_ok']: # proful poate in ziua aia
-                                        if hours in permisiuni[t]['ore_ok']: # proful poate preda in orele alea
-                                            overlap = False
-                                            for room2 in sali:
-                                                if room2 != room:
-                                                    if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
-                                                        overlap = True # verific sa nu fie aceeasi persoana in doua locuri diferite in acelasi timp
-                                                        break
-                                            if not overlap:
-                                                dummy = (day, hours, room, t, sub)
-                                                actions.append(dummy)
+    v_profi = {}
+    v_cap  = {}
+    for prof in profi:
+        v_profi[prof] = 0
+    for mat in materii:
+        v_cap[mat] = 0
+    for sub in materii:
+        for room in sali:
+            for t in profi:
+                for day in zile:
+                    for hours in intervale:
+                        if state[day][hours][room] == ():  # Check if room is free at this time
+                            if sub in profi[t]['Materii'] and sub in sali[room]['Materii']:
+                                if day in permisiuni[t]['zile_ok'] and hours in permisiuni[t]['ore_ok']:
+                                    overlap = False
+                                    for room2 in sali:
+                                        if room2 != room and state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
+                                            overlap = True
+                                            break
+                                    if not overlap:
+                                        v_cap[sub] += sali[room]['Capacitate']
+                                        v_profi[t] += 1
+                                        actions.append((day, hours, room, t, sub))
+                                        if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
+                                            break  # Exit the hours loop
+                    if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
+                        break  # Exit the days loop
+                if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
+                    break  # Exit the teachers loop
+                if v_profi[t] > 7:  # Check if teacher has more then 7 intrevals
+                    break  # Exit the teachers loop
+            if v_cap[sub] >= materii[sub]:  # Check if enough students are assigned or the room capacity is reached
+                break # Exit room loop
     return actions
+
 
 def __generate_actions1__(profi, sali, zile, intervale):
     ''' 
@@ -240,7 +253,7 @@ def __get__pref_conflicts__(sched, permisiuni):
     for zi in sched:
         for ore in sched[zi]:
             for sala in sched[zi][ore]:
-                if len(sched[zi][ore][sala]) >= 1 and zi in permisiuni[sched[zi][ore][sala][0]]['zile_ok']:
+                if len(sched[zi][ore][sala]) >= 1 and sched[zi][ore][sala][0] is not None and zi in permisiuni[sched[zi][ore][sala][0]]['zile_ok']:
                     for tupl in permisiuni[sched[zi][ore][sala][0]]['ore_ok']:
                         if str(tupl) != ore:
                             nr += 1
@@ -294,7 +307,7 @@ def __get_overh_conflicts__(board, profi):
     for zi in board:
         for ore in board[zi]:
             for sali in board[zi][ore]:
-                if len(board[zi][ore][sali]) >= 1:
+                if len(board[zi][ore][sali]) >= 2 and board[zi][ore][sali][0] is not None:
                     teach[board[zi][ore][sali][0]] += 1
     for t in teach:
         if teach[t] > 7:
@@ -412,7 +425,7 @@ def hill_climbing1(initial_state, profi, permisiuni, max_iters, sali, zile, inte
     best_state = deepcopy(current_state)
     for _ in range(max_iters):
         current_conflicts = __get_all_conflicts__(current_state, profi, permisiuni)
-        okok = __get_aviable_actions1__(current_state, profi, sali, zile, intervale, materii, permisiuni)
+        okok = __get_aviable_actions__(current_state, profi, sali, zile, intervale, materii, permisiuni)
         if okok == []:
             break
         index = randint(0, len(okok) - 1)
@@ -429,6 +442,34 @@ def hill_climbing1(initial_state, profi, permisiuni, max_iters, sali, zile, inte
             best_conflicts = confl
             current_state = deepcopy(vecin)
     return best_state
+
+def hill_climbing12(initial_state, profi, permisiuni, max_iters, sali, zile, intervale, materii):
+    '''
+    Implements a hill climbing algorithm to optimize a schedule by reducing conflicts.
+    '''
+    current_state = deepcopy(initial_state)
+    best_conflicts = __get_all_conflicts__(current_state, profi, permisiuni)
+    best_state = deepcopy(current_state)
+    for _ in range(max_iters):
+        current_conflicts = __get_all_conflicts__(current_state, profi, permisiuni)
+        okok = _get_aviable_actions12_(current_state, profi, sali, zile, intervale, materii, permisiuni)
+        if okok == []:
+            break
+        index = randint(0, len(okok) - 1)
+        action = okok[index]
+        vecin = deepcopy(current_state)
+        move = __aply_move__(action, vecin)
+        # if is_valid
+        confl = __get_all_conflicts__(vecin, profi, permisiuni)
+        if current_conflicts < best_conflicts: 
+            best_conflicts = current_conflicts
+        else:
+            # __undo_move__(current_state, action)
+            best_state = deepcopy(vecin)
+            best_conflicts = confl
+            current_state = deepcopy(vecin)
+    return best_state
+
 # --------------------------------------------------------------------------------------
 # mcts
 # def print_tree(tree, indent = 0):
@@ -623,7 +664,7 @@ if __name__ == "__main__":
         # we populate the timetable with all arrangements
         __populate_cobai2__(cobai, longer2)
         # state = hill_climbing(test, longer2, profi, permisiuni, cobai, sys.maxsize)
-        state = hill_climbing1(test, profi, permisiuni, sys.maxsize,sali, zile, intervale, materii)
+        state = hill_climbing12(test, profi, permisiuni, sys.maxsize, sali, zile, intervale, materii)
         print(pretty_print_timetable(state, filename))
     if ok == 2:
         cv, tree = mcts(test, 11, None, None, zile, intervale, sali, profi, materii, permisiuni, CP)
