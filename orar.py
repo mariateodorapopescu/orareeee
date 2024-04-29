@@ -219,8 +219,6 @@ def _get_teach_total_(state, teacher):
                     count += 1
     return count
 
-from math import ceil
-
 def __get_min_max_room_sub__(sali, materii):
     dictt = {}
     for mat in materii:
@@ -228,6 +226,7 @@ def __get_min_max_room_sub__(sali, materii):
         mini = 9999
         maxi = 0
         for room in sali:
+            # print(room, mat)
             if mat in sali[room]['Materii']:
                 if mini > sali[room]['Capacitate']:
                     mini = sali[room]['Capacitate']
@@ -248,9 +247,23 @@ def __get_nr_subs__(state, sub):
                         nr += 1
     return nr
 
-def gata(state, sub, room, materii):
-    dictt = __get_min_max_room_sub__(room, materii)
-    return __get_nr_subs__(state, sub) >= dictt[sub]['Min']
+def how_many(state, materii, sali):
+    dictt = {}
+    for mat in materii:
+        dictt[mat] = 0
+    if state != {} and state is not None:
+        for day in state:
+            if state[day] != {} and state[day] is not None:
+                for hours in state[day]:
+                    if state[day][hours] != {} and state[day][hours] != {}:
+                        for room in state[day][hours]:
+                            if state[day][hours][room] is not None and state[day][hours][room] != () and len(state[day][hours][room]) >= 2:
+                                dictt[state[day][hours][room][1]] += sali[room]['Capacitate']
+    return dictt
+
+def gata(state, sub, sali, materii):
+    dictt = __get_min_max_room_sub__(sali, materii)
+    return __get_nr_subs__(state, sub) >= dictt[sub]['Max']
 
 def get_nr_hours(state, prof):
     nr = 0
@@ -264,40 +277,69 @@ def get_nr_hours(state, prof):
     return nr
 
 def donee(state, prof):
-    return get_nr_hours(state, prof) <= 7
+    return get_nr_hours(state, prof) < 7
 
-def  __get_aviable_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
-    ''' 
-    Generates all possible actions from the lists of days, intervals, teachers
-    in order to satisfact the constraints of days, intervals 
-    and their own subjects with rooms for each subject for teachers
-    Bullets 2, 5, 6 from hard constraints
-    '''
+def get_min_sub(materii):
+    mini = 9999
+    minii = None
+    for sub in materii:
+        if mini > materii[sub]:
+            mini = materii[sub]
+            minii = sub
+    return minii
+
+def acoperit_minim(state, materii, sali):
+    ok = False
+    mat = get_min_sub(materii)
+    nr = 0
+    if state != {} and state is not None:
+        for day in state:
+            if state[day] != {} and state[day] is not None:
+                for hours in state[day]:
+                    if state[day][hours] is not None and state[day][hours] != {}:
+                        for room in state[day][hours]:
+                            if state[day][hours][room] is not None and state[day][hours][room] != () and len(state[day][hours][room]) >= 2:
+                                if state[day][hours][room][1] == mat:
+                                    nr += sali[room]['Capacitate']
+    return nr >= materii[mat]
+                                
+def get_total_students(materii, min_subject):
+    total_students = 0
+    for sub, nr_stud in materii.items():
+        if sub == min_subject:
+            total_students += nr_stud
+    return total_students
+
+def __get_aviable_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
     actions = []
+    materii_sortate = dict(sorted(materii.items(), key=lambda x: x[1]))
+    min_subject = get_min_sub(materii)
+    total_students_min_subject = get_total_students(materii, min_subject)
     for day in zile:
         for hours in intervale:
             for room in sali:
                 for t in profi:
-                    # print("ore ok si zile ok prof:" + t + ":" + str(list(permisiuni[t]['ore_ok'])) + "-" + str(list(permisiuni[t]['zile_ok'])))
-                    if donee(state, t):  # Check if teacher has less than or equal to 7 intervals
-                        for sub in materii:
+                    if donee(state, t):  
+                        for sub in materii_sortate:
                             if state[day][hours][room] == ():
-                                if sub in profi[t]['Materii']:  # Check if teacher teaches this subject
-                                    if sub in sali[room]['Materii']:  # Check if subject can be taught in this room
-                                        if day in permisiuni[t]['zile_ok']:  # Check if teacher is available on this day
-                                            if hours in permisiuni[t]['ore_ok']:  # Check if teacher is available at this hour
-                                                if not gata(state, sub, sali, materii):  # Check if subject needs more rooms
-                                                    overlap = False
-                                                    for room2 in sali:
-                                                        if room2 != room:
-                                                            if state[day][hours][room2] != () and len(
-                                                                    state[day][hours][room2]) >= 1 and \
-                                                                    state[day][hours][room2][0] == t:
-                                                                overlap = True  # Check if same teacher is teaching in another room
-                                                                break
-                                                    if not overlap:
-                                                        dummy = (day, hours, room, t, sub)
-                                                        actions.append(dummy)
+                                if sub in profi[t]['Materii']:  
+                                    if sub in sali[room]['Materii']:  
+                                        if day in permisiuni[t]['zile_ok']:  
+                                            if hours in permisiuni[t]['ore_ok']:  
+                                                if not gata(state, sub, sali, materii):  
+                                                    if not acoperit_minim(state, materii, sali): 
+                                                        if __get_nr_subs__(state, sub) < total_students_min_subject:
+                                                            overlap = False
+                                                            for room2 in sali:
+                                                                if room2 != room:
+                                                                    if state[day][hours][room2] != () and len(
+                                                                            state[day][hours][room2]) >= 1 and \
+                                                                            state[day][hours][room2][0] == t:
+                                                                        overlap = True  
+                                                                        break
+                                                            if not overlap:
+                                                                dummy = (day, hours, room, t, sub)
+                                                                actions.append(dummy)
     return actions
 
 def __generate_actions1__(profi, sali, zile, intervale):
@@ -755,6 +797,8 @@ if __name__ == "__main__":
         __populate_cobai2__(cobai, longer2)
         # state = hill_climbing(test, longer2, profi, permisiuni, cobai, sys.maxsize)
         state = hill_climbing12(test, profi, permisiuni, sys.maxsize, sali, zile, intervale, materii)
+        print(how_many(state,materii,sali))
+        print("-----------------------------------------")
         print(pretty_print_timetable(state, filename))
     if ok == 2:
         cv, tree = mcts(test, 11, None, None, zile, intervale, sali, profi, materii, permisiuni, CP)
