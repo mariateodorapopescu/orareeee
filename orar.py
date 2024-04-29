@@ -104,7 +104,7 @@ def __get_nr_subjects__(state, subject):
                         nr += 1
     return nr
 
-def get_nr_hours(state, prof):
+def __get_nr_hours__(state, prof):
     '''
     Finds the intervals a teacher teaches in the whole timetable generated at a certain point\n
     Args:\n
@@ -122,7 +122,7 @@ def get_nr_hours(state, prof):
                         nr += 1
     return nr
 
-def get_min_subject(courses):
+def __get_min_subject__(courses):
     '''
     Finds the subject with the minimum number of students enrolled in\n
     Args:\n
@@ -136,34 +136,7 @@ def get_min_subject(courses):
             minii = subject
     return minii
 
-def get_max_subject(courses):
-    '''
-    Finds the subject with the maximum number of students enrolled in\n
-    Args:\n
-    - courses - {string: int}, with subject and number of students enrolled in
-    '''
-    mini = 0
-    minii = None
-    for subject in courses:
-        if mini < courses[subject]:
-            mini = courses[subject]
-            minii = subject
-    return minii
-
-def get_total_students(courses, min_subject):
-    '''
-    Finds the total number of students enrolled in all subjects\n
-    Args:\n
-    - courses - {string: int}, with subject and number of students enrolled in\n
-    - min_subject - string
-    '''
-    total_students = 0
-    for subject, nr_stud in courses.items():
-        if subject == min_subject:
-            total_students += nr_stud
-    return total_students
-
-def how_many(state, courses, rooms):
+def __how_many__(state, courses, rooms):
     '''
     Finds how many students are enrolled in a subject at a certain time from the whole timetable\n
     Args:\n
@@ -186,7 +159,7 @@ def how_many(state, courses, rooms):
     return dictt
 # --------------------------------------------------------------------------------------
 # checkers -> to see if rooms fullfilled etc
-def gata(state, subject, rooms, courses):
+def __ok__(state, subject, rooms, courses):
     '''
     Checks whether a subject has at least as many rooms as the maximum number of rooms at a certain point in timetable\n
     Args:\n
@@ -199,7 +172,7 @@ def gata(state, subject, rooms, courses):
     dictt = __get_min_max_room_subject__(rooms, courses)
     return __get_nr_subjects__(state, subject) >= dictt[subject]['Max']
 
-def donee(state, prof):
+def __done__(state, prof):
     '''
     Checks whether a teacher has their norm of 14h\n
     Args:\n
@@ -207,9 +180,9 @@ def donee(state, prof):
     {day: {(start, end): {room: (teacher, course)}}} \n
     - prof - string
     '''
-    return get_nr_hours(state, prof) < 7
+    return __get_nr_hours__(state, prof) < 7
 
-def acoperit_minim(state, courses, rooms):
+def __acoperit_minim__(state, courses, rooms):
     '''
     Checks whether the subject with the least students enrolled in has all the students enrolled in\n
     Args:\n
@@ -218,7 +191,7 @@ def acoperit_minim(state, courses, rooms):
     - courses - {string: int}, with subject and number of students enrolled in
     - rooms - {string:{'Materii': , 'Capacitate': }} with room names and numbers
     '''
-    subject = get_min_subject(courses)
+    subject = __get_min_subject__(courses)
     nr = 0
     if state != {} and state is not None:
         for day in state:
@@ -230,27 +203,6 @@ def acoperit_minim(state, courses, rooms):
                                 if state[day][hours][room][1] == subject:
                                     nr += rooms[room]['Capacitate']
     return nr >= courses[subject]
-
-def all_subjects_fulfilled(state, courses, rooms):
-    '''
-    Checks whether all subjects have all the students enrolled in\n
-    Args:\n
-    - state - {string: {(int, int): {string: (string, string)}}} with the timetable with 
-    {day: {(start, end): {room: (teacher, course)}}}
-    - courses - {string: int}, with subject and number of students enrolled in
-    - rooms - {string:{'Materii': , 'Capacitate': }} with room names and numbers
-    '''
-    total_students = {subject: 0 for subject in courses}
-    for day in state:
-        for hours in state[day]:
-            for room in state[day][hours]:
-                if state[day][hours][room] is not None and state[day][hours][room] != () and len(state[day][hours][room]) >= 2:
-                    subject = state[day][hours][room][1]
-                    total_students[subject] += rooms[room]['Capacitate']
-    for subject, required_students in courses.items():
-        if total_students[subject] < required_students:
-            return False
-    return True
 # --------------------------------------------------------------------------------------
 # generators
 def __get_available_actions__(state, teachers, rooms, days, intervals, courses, permissions):
@@ -276,15 +228,15 @@ def __get_available_actions__(state, teachers, rooms, days, intervals, courses, 
         for hours in intervals:
             for room in rooms:
                 for t in teachers:
-                    if donee(state, t):  
+                    if __done__(state, t):  
                         for subject in courses:
                             if state[day][hours][room] == ():
                                 if subject in teachers[t]['Materii']:  
                                     if subject in rooms[room]['Materii']:  
                                         if day in permissions[t]['days_ok']:  
                                             if hours in permissions[t]['good_intervals']:  
-                                                if not gata(state, subject, rooms, courses):  
-                                                    if not acoperit_minim(state, courses, rooms): 
+                                                if not __ok__(state, subject, rooms, courses):  
+                                                    if not __acoperit_minim__(state, courses, rooms): 
                                                         if __get_nr_subjects__(state, subject) < total_students_min_subject:
                                                             overlap = False
                                                             for room2 in rooms:
@@ -299,7 +251,47 @@ def __get_available_actions__(state, teachers, rooms, days, intervals, courses, 
                                                                 actions.append(dummy)
     return actions
 
-def __aply_move__(action, state):
+def __get_available_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
+    ''' 
+    Generates all possible actions from the lists of days, intervals, teachers
+    in order to satisfact the constraints of days, intervals 
+    and their own subjects with rooms for each subject for teachers
+    Bullets 2, 5, 6 from hard constraints
+    Args:\n
+    - state - {string: {(int, int): {string: (string, string)}}} with the timetable with 
+    {day: {(start, end): {room: (teacher, course)}}}\n
+    - courses - {string: int}, with subject and number of students enrolled in\n
+    - rooms - {string:{'Materii': , 'Capacitate': }} with room names and numbers\n
+    - teachers - {string: {'Materii': [string], 'Constrangeri': }} 
+        - what teachers are there, what they teach and their preferences\n
+    - days - [string], with days \n
+    - intervals - [(int, int)] with hour intervals \n
+    - permissions - [(string, (int, int), string, string, string)] - [(day, interval, room, teacher, subject)] 
+        - array with all possible moves to put in the timetable
+    '''
+    actions = []
+    for sub in materii:
+        for room in sali:
+            for t in profi:
+                for hours in intervale:
+                    for day in zile:
+                        if state[day][hours][room] == ():
+                            if sub in profi[t]['Materii']: # proful preda materia aia
+                                if sub in sali[room]['Materii']: # materia se face in sala aia
+                                    if day in permisiuni[t]['days_ok']: # proful poate in ziua aia
+                                        if hours in permisiuni[t]['good_intervals']: # proful poate preda in orele alea
+                                            overlap = False
+                                            for room2 in sali:
+                                                if room2 != room:
+                                                    if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
+                                                        overlap = True # verific sa nu fie aceeasi persoana in doua locuri diferite in acelasi timp
+                                                        break
+                                            if not overlap:
+                                                dummy = (day, hours, room, t, sub)
+                                                actions.append(dummy)
+    return actions
+
+def __apply_action__(action, state):
     '''
     Just puts a longer card in timetable. No mhourss shorter cards\n
     Args:\n
@@ -452,7 +444,7 @@ def __get_all_conflicts__(state, teachers, permissions):
 # --------------------------------------------------------------------------------------
 # algorithms part
 # hill climbing
-def is_final(state):
+def __is_final__(state):
     '''
     For me, the final state is the one in which all students have where to stay\n
     Args:\n
@@ -461,7 +453,7 @@ def is_final(state):
     '''
     return __get_capacity_conflicts__(state) == 0
 
-def hill_climbing(initial_state, teachers, permissions, max_iters, rooms, days, intervals, courses):
+def __hill_climbing__(initial_state, teachers, permissions, max_iters, rooms, days, intervals, courses):
     '''
     Implements a hill climbing algorithm to optimize a schedule by reducing conflicts.\n
     Args:\n
@@ -488,7 +480,7 @@ def hill_climbing(initial_state, teachers, permissions, max_iters, rooms, days, 
         index = randint(0, len(okok) - 1)
         action = okok[index]
         vecin = deepcopy(current_state)
-        move = __aply_move__(action, vecin)
+        move = __apply_action__(action, vecin)
         confl = __get_all_conflicts__(vecin, teachers, permissions)
         if current_conflicts < best_conflicts: 
             best_conflicts = current_conflicts
@@ -499,7 +491,7 @@ def hill_climbing(initial_state, teachers, permissions, max_iters, rooms, days, 
     return best_state
 
 # --------------------------------------------------------------------------------------
-# mcts           
+# mcts          
 def init_node(state, parent):
     '''
     Initializes a new node for the Monte Carlo Tree Search algorithm.\n
@@ -511,7 +503,7 @@ def init_node(state, parent):
     '''
     return {'N': 0, 'Q': 0, 'STATE': state, 'PARENT': parent, 'ACTIONS': {}}
 
-def select_action(node, c, teachers, rooms, permissions):
+def __select_action__(node, c, teachers, rooms, permissions):
     '''
     Selects the best move to put in the timetable -> taken from the laboratory\n
     Args:\n
@@ -541,7 +533,7 @@ def select_action(node, c, teachers, rooms, permissions):
             max_scor = scor
     return mutare_optima
 
-def mcts(state0, budget, tree, opponent_s_action, days, intervals, rooms, teachers, courses, permissions, c):
+def __mcts__(state0, budget, tree, opponent_s_action, days, intervals, rooms, teachers, courses, permissions, c):
     '''
     Implements a monte carlo tree search algorithm to optimize a schedule by reducing conflicts.\n
     Args:\n
@@ -568,28 +560,28 @@ def mcts(state0, budget, tree, opponent_s_action, days, intervals, rooms, teache
     for _ in range(budget):
         node = tree
         state = deepcopy(state0)
-        while not is_final(state):
+        while not __is_final__(state):
             new_state = deepcopy(node['STATE'])
-            posibilitati = __get_available_actions__(new_state, teachers, rooms, days, intervals, courses, permissions)
+            posibilitati = __get_available_actions1__(state, teachers, rooms, days, intervals, courses, permissions)
             if not all(mutare in node['ACTIONS'] for mutare in posibilitati):
                 break
-            mutare_noua = select_action(node, c, teachers, rooms, permissions)
-            new_state = __aply_move__(mutare_noua, new_state)
+            mutare_noua = __select_action__(node, c, teachers, rooms, permissions)
+            new_state = __apply_action__(mutare_noua, new_state)
             node['ACTIONS'][mutare_noua] = new_state
             node = node['ACTIONS'][mutare_noua]
-        isok = __get_available_actions__(new_state, teachers, rooms, days, intervals, courses, permissions)
-        if not is_final(new_state) and isok is not None: 
+        isok = __get_available_actions1__(state, teachers, rooms, days, intervals, courses, permissions)
+        if not __is_final__(new_state) and isok is not None: 
             index = randint(0, len(isok) - 1)
             alta_mutare_noua = isok[index]
-            ceva = __aply_move__(alta_mutare_noua, new_state)
+            ceva = __apply_action__(alta_mutare_noua, new_state)
             node['ACTIONS'][alta_mutare_noua] = new_state
             node = node['ACTIONS'][alta_mutare_noua]
-        while not is_final(new_state) and posibilitati != [] and posibilitati is not None:
-            posibilitati = __get_available_actions__(new_state, teachers, rooms, days, intervals, courses, permissions)
+        while not __is_final__(new_state) and posibilitati != [] and posibilitati is not None:
+            posibilitati = __get_available_actions1__(state, teachers, rooms, days, intervals, courses, permissions)
             if posibilitati != [] and posibilitati is not None:
                 indexx = randint(0, len(posibilitati) - 1)
                 mutare = posibilitati[indexx]
-                undeeee = __aply_move__(mutare, new_state)
+                undeeee = __apply_action__(mutare, new_state)
         while node:
             if node:
                 node['N'] = node.get('N', 0) + 1
@@ -599,7 +591,7 @@ def mcts(state0, budget, tree, opponent_s_action, days, intervals, rooms, teache
                     node['Q'] = node.get('Q', 0) - 1
                     node = node.get('PARENT', 0)
     if tree:
-        final_action = select_action(tree, c, teachers, rooms, permissions)
+        final_action = __select_action__(tree, c, teachers, rooms, permissions)
         return (final_action, tree['ACTIONS'][final_action])
 
     return (0, init_node(state0, None))
@@ -646,13 +638,12 @@ if __name__ == "__main__":
     
     if ok == 1:
         # we populate the timetable with all arrangements
-        orar = hill_climbing(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
-        print(how_many(orar, courses, rooms))
-        print("------------------------------------------------------------------------------------------------------")
+        orar = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
+        # print(__how_many__(orar, courses, rooms))
+        # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar, filename))
     if ok == 2:
-        cv, tree = mcts(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
-        # if tree: print(enumerate(tree.values())[0])
+        cv, tree = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
         orar = {}
         if 'Luni' in tree:
             orar['Luni'] = tree['Luni']
@@ -664,6 +655,6 @@ if __name__ == "__main__":
             orar['Joi'] = tree['Joi']
         if 'Vineri' in tree:
             orar['Vineri'] = tree['Vineri']
-        print(how_many(orar, courses, rooms))
-        print("------------------------------------------------------------------------------------------------------")
+        # print(__how_many__(orar, courses, rooms))
+        # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar, filename))
