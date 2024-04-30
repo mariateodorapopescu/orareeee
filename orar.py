@@ -6,6 +6,8 @@ from utils import pretty_print_timetable
 from random import randint
 from math import sqrt, log, ceil
 import time
+import matplotlib.pyplot as plt
+
 # imports
 # --------------------------------------------------------------------------------------
 # initialize things
@@ -470,6 +472,7 @@ def __hill_climbing__(initial_state, teachers, permissions, max_iters, rooms, da
         - array with all possible moves to put in the timetable
     - max_iters - int - how many times to try to generate a new timetable from 0
     '''
+    nr = 0
     current_state = deepcopy(initial_state)
     best_conflicts = __get_all_conflicts__(current_state, teachers, permissions)
     best_state = deepcopy(current_state)
@@ -482,6 +485,7 @@ def __hill_climbing__(initial_state, teachers, permissions, max_iters, rooms, da
         action = okok[index]
         vecin = deepcopy(current_state)
         move = __apply_action__(action, vecin)
+        nr += 1
         confl = __get_all_conflicts__(vecin, teachers, permissions)
         if current_conflicts < best_conflicts: 
             best_conflicts = current_conflicts
@@ -489,7 +493,7 @@ def __hill_climbing__(initial_state, teachers, permissions, max_iters, rooms, da
             best_state = deepcopy(vecin)
             best_conflicts = confl
             current_state = deepcopy(vecin)
-    return best_state
+    return best_state, nr
 
 # --------------------------------------------------------------------------------------
 # mcts
@@ -574,6 +578,7 @@ def __select_action__(node, c, profi, sali, permisiuni):
     return mutare_optima
 
 def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, materii, permisiuni, c):
+    nr = 0
     if tree is not None and opponent_s_action in tree['ACTIONS']:
         tree = tree['ACTIONS'][opponent_s_action]
     else:
@@ -607,6 +612,7 @@ def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, pro
                 indexx = randint(0, len(posibilitati) - 1)
                 mutare = posibilitati[indexx]
                 undeeee = __apply_action__(mutare, new_state)
+                nr += 1
 
         while node:
             if node:
@@ -619,9 +625,9 @@ def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, pro
 
     if tree:
         final_action = __select_action__(tree, c, profi, sali, permisiuni)
-        return (final_action, tree['ACTIONS'][final_action])
+        return (final_action, tree['ACTIONS'][final_action], nr)
 
-    return (0, __init_node__(state0, None))
+    return (0, __init_node__(state0, None), nr)
 
 # --------------------------------------------------------------------------------------
 # main
@@ -637,7 +643,10 @@ if __name__ == "__main__":
             if sys.argv[1] == "mcts":
                 ok = 2
             else:
-                print("Please provide right algo")
+                if sys.argv[1] == "all":
+                    ok = 3
+                else:
+                    print("Please provide right algo")
     filename = "inputs/" + sys.argv[2]
     
     # my reader
@@ -667,14 +676,16 @@ if __name__ == "__main__":
     
     if ok == 1:
         # we populate the timetable with all arrangements
-        orar = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
+        orar, nr_stari = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
         end_time1 = time.time()
-        # print(__how_many__(orar, courses, rooms))
-        # print(end_time1 - start_time)
-        # print("------------------------------------------------------------------------------------------------------")
+        print(nr_stari)
+        print(__get_all_conflicts__(orar, teachers, permissions))
+        print(__how_many__(orar, courses, rooms))
+        print(end_time1 - start_time)
+        print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar, filename))
     if ok == 2:
-        cv, tree = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
+        cv, tree, nr_stari = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
         end_time2 = time.time()
         orar = {}
         if 'Luni' in tree:
@@ -687,7 +698,64 @@ if __name__ == "__main__":
             orar['Joi'] = tree['Joi']
         if 'Vineri' in tree:
             orar['Vineri'] = tree['Vineri']
-        # print(__how_many__(orar, courses, rooms))
-        # print(end_time2 - start_time)
-        # print("------------------------------------------------------------------------------------------------------")
+        print(nr_stari)
+        print(__get_all_conflicts__(orar, teachers, permissions))
+        print(__how_many__(orar, courses, rooms))
+        print(end_time2 - start_time)
+        print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar, filename))
+    if ok == 3:
+        # we populate the timetable with all arrangements
+        orar1, nr_stari1 = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
+        end_time21 = time.time()
+        # print(nr_stari1)
+        confl1 = __get_all_conflicts__(orar1, teachers, permissions)
+        # print(__get_all_conflicts__(orar1, teachers, permissions))
+        # print(__how_many__(orar1, courses, rooms))
+        time1 = end_time21 - start_time
+        # print(time1)
+        # print("------------------------------------------------------------------------------------------------------")
+        print(pretty_print_timetable(orar1, filename))
+        print("------------------------------------------------------------------------------------------------------")
+        cv1, tree1, nr_stari2 = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
+        end_time22 = time.time()
+        orar2 = {}
+        if 'Luni' in tree1:
+            orar2['Luni'] = tree1['Luni']
+        if 'Marti' in tree1:
+            orar2['Marti'] = tree1['Marti']
+        if 'Miercuri' in tree1:
+            orar2['Miercuri'] = tree1['Miercuri']
+        if 'Joi' in tree1:
+            orar2['Joi'] = tree1['Joi']
+        if 'Vineri' in tree1:
+            orar2['Vineri'] = tree1['Vineri']
+        confl2 = __get_all_conflicts__(orar2, teachers, permissions)
+        # print(__how_many__(orar2, courses, rooms))
+        time2 = end_time22 - start_time
+        # print("------------------------------------------------------------------------------------------------------")
+        print(pretty_print_timetable(orar2, filename))
+        
+        # Grafic timp de executie
+        plt.bar(["HC", "MCTS"], [time1, time2])
+        plt.xlabel('Algoritm')
+        plt.ylabel('Timp')
+        plt.title('Comparatie timp')
+        plt.savefig('timp.png')
+        plt.close()
+        
+        # Grafic constrangeri
+        plt.bar(["HC", "MCTS"], [confl1, confl2])
+        plt.xlabel('Algoritm')
+        plt.ylabel('Numar conflicte')
+        plt.title('Comparatie conflicte')
+        plt.savefig('confl.png')
+        plt.close()
+        
+        # Grafic numar stari
+        plt.bar(["HC", "MCTS"], [nr_stari1, nr_stari2])
+        plt.xlabel('Algoritm')
+        plt.ylabel('Numar stari')
+        plt.title('Comparatie numar stari')
+        plt.savefig('stari.png')
+        plt.close()
