@@ -309,6 +309,59 @@ def __apply_action__(action, state):
     return dummy
 # --------------------------------------------------------------------------------------
 # conflicts
+def __constr__(state, permisiuni, rooms, teachers, courses):
+    nr = 0
+    flagg = False
+    # daca toate materiile au toti studentii inrolati/loc
+    dictionaryy = __how_many__(state, courses, rooms)
+    for mat in dictionaryy:
+        if dictionaryy[mat] < courses[mat]:
+            flagg = True
+            print("Nu se acopera materia " + mat)
+    if flagg:
+        nr += 1
+    if state is not None and state != {}:
+        for day in state:
+            if state[day] is not None and state[day] != {}:
+                for hours in state[day]:
+                    if state[day][hours] is not None and state[day][hours] != {}:
+                        for room in state[day][hours]:
+                            if state[day][hours][room] is not None and state[day][hours][room] != () and len(state[day][hours][room]) >= 2:
+                                (teacher, subject) = state[day][hours][room]
+                                if state[day][hours][room] != ():
+                                    if __get_nr_hours__(state, subject) > 7: # daca proful are mai mult de 7 intrevale, vezi functia de mai sus
+                                        nr += 1
+                                        print(teacher + " are mai mult de 7 intervale")
+                                    if subject not in teachers[teacher]['Materii']: # proful nu preda materia aia
+                                        nr += 1
+                                        print(teacher + " nu preda materia " + subject)
+                                    if subject not in rooms[room]['Materii']: # materia nu se face in sala aia
+                                        nr += 1
+                                        print(subject + " nu se face in sala " + room)
+                                    if day not in permisiuni[teacher]['days_ok']: # proful nu poate in ziua aia
+                                        nr += 1
+                                        print(teacher + " nu poate in ziua " + day)
+                                    if hours not in permisiuni[teacher]['good_intervals']: # proful nu poate preda in orele alea
+                                        nr += 1
+                                        print(teacher + " nu poate in orele " + str(hours))
+                                    for room2 in rooms:
+                                        if room2 != room:
+                                            if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == teacher:
+                                                nr += 1
+                                                print(teacher + " preda in doua sali diferite ")
+                                              
+    # intr-un interval orar si intr-o sala se sustine o singura materie de catre un singur profesor
+    # -> din modul de constructie/generare -> dictionar in dictionar in dictionar -> chei unice
+    
+    # intr-un interval orar, un profesor tine o singura materie, intr-o singura sala
+    # -> din modul de constructie/generare -> desi e tuplu de 2 elemente
+    
+    # o sala permite intr-un interval orar prezenta unui numar de studenti
+    # mai mic sau egal decat capacitatea ei maxima -> din modul de constructie 
+    # -> cand am numarat, am luat calupuri de cate <capacitate sala> de studenti
+
+    return nr
+
 def __get__pref_conflicts__(state, permissions):
     '''
     Checks soft permissions without the !Pauza constraint
@@ -709,11 +762,11 @@ if __name__ == "__main__":
         orar1, nr_stari1 = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
         end_time21 = time.time()
         # print(nr_stari1)
-        confl1 = __get_all_conflicts__(orar1, teachers, permissions)
+        confl1 = __constr__(orar1, permissions, rooms, teachers, courses)
         # print(__get_all_conflicts__(orar1, teachers, permissions))
-        # print(__how_many__(orar1, courses, rooms))
+        print(__how_many__(orar1, courses, rooms))
         time1 = end_time21 - start_time
-        # print(time1)
+        print(confl1)
         # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar1, filename))
         print("------------------------------------------------------------------------------------------------------")
@@ -730,8 +783,9 @@ if __name__ == "__main__":
             orar2['Joi'] = tree1['Joi']
         if 'Vineri' in tree1:
             orar2['Vineri'] = tree1['Vineri']
-        confl2 = __get_all_conflicts__(orar2, teachers, permissions)
-        # print(__how_many__(orar2, courses, rooms))
+        confl2 = __constr__(orar2, permissions, rooms, teachers, courses)
+        print(__how_many__(orar2, courses, rooms))
+        print(confl2)
         time2 = end_time22 - start_time
         # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar2, filename))
