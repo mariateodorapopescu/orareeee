@@ -310,6 +310,17 @@ def __apply_action__(action, state):
 # --------------------------------------------------------------------------------------
 # conflicts
 def __constr__(state, permissions, rooms, teachers, courses):
+    '''
+    Returns the number of all types of the constraints
+    - state - {string: {(int, int): {string: (string, string)}}} with the timetable with 
+    {day: {(start, end): {room: (teacher, course)}}}\n
+    - courses - {string: int}, with subject and number of students enrolled in\n
+    - rooms - {string:{'Materii': , 'Capacitate': }} with room names and numbers\n
+    - teachers - {string: {'Materii': [string], 'Constrangeri': }} 
+        - what teachers are there, what they teach and their preferences\n
+    - permissions - [(string, (int, int), string, string, string)] - [(day, interval, room, teacher, subject)] 
+        - array with all possible moves to put in the timetable
+    '''
     nr = 0
     flagg = False
     # daca toate materiile au toti studentii inrolati/loc
@@ -715,10 +726,10 @@ if __name__ == "__main__":
             
     #parser, because 'duh!
     courses = data['Materii']
-    intervals1 = data['intervals']
+    intervals1 = data['Intervale']
     teachers = data['Profesori']
-    rooms = data['rooms']
-    days = data['days']
+    rooms = data['Sali']
+    days = data['Zile']
     intervals = [eval(i) for i in intervals1]
 
     # we start with this
@@ -735,7 +746,10 @@ if __name__ == "__main__":
         orar, nr_stari = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
         end_time1 = time.time()
         confl1 = __constr__(orar, permissions, rooms, teachers, courses)
-        print(pretty_print_timetable(orar, filename))
+        # print(pretty_print_timetable(orar, filename))
+        with open('output.txt', 'a') as file:
+            # Write the content to the file
+            file.write(pretty_print_timetable(orar, filename))
     if ok == 2:
         cv, tree, nr_stari = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
         end_time2 = time.time()
@@ -751,13 +765,18 @@ if __name__ == "__main__":
             orar['Joi'] = tree['Joi']
         if 'Vineri' in tree:
             orar['Vineri'] = tree['Vineri']
-        print(pretty_print_timetable(orar, filename))
+        # print(pretty_print_timetable(orar, filename))
+        with open('output.txt', 'a') as file:
+            # Write the content to the file
+            file.write(pretty_print_timetable(orar, filename))
     if ok == 3:
         orar1, nr_stari1 = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
         end_time21 = time.time()
         confl1 = __constr__(orar1, permissions, rooms, teachers, courses)
         time1 = end_time21 - start_time
-        print(pretty_print_timetable(orar1, filename))
+        with open('output.txt', 'a') as file:
+            # Write the content to the file
+            file.write(pretty_print_timetable(orar1, filename))
         
         cv1, tree1, nr_stari2 = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
         end_time22 = time.time()
@@ -774,7 +793,9 @@ if __name__ == "__main__":
             orar2['Vineri'] = tree1['Vineri']
         confl2 = __constr__(orar2, permissions, rooms, teachers, courses)
         time2 = end_time22 - start_time
-        print(pretty_print_timetable(orar2, filename))
+        with open('output.txt', 'a') as file:
+            # Write the content to the file
+            file.write(pretty_print_timetable(orar2, filename))
         
         # Grafic timp de executie
         plt.bar(["HC", "MCTS"], [time1, time2])
