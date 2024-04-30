@@ -702,18 +702,15 @@ start_time = time.time()
 if __name__ == "__main__":
     ok = 0
     if len(sys.argv) < 3:
-        print("Please provide algo + input.")
+        print("Please provide algoritm and input data!")
     else:
         if sys.argv[1] == "hc":
             ok = 1
         else:
             if sys.argv[1] == "mcts":
                 ok = 2
-            else:
-                if sys.argv[1] == "all":
-                    ok = 3
-                else:
-                    print("Please provide right algo")
+            else:    
+                print("Please provide right algorithm!")
     filename = "inputs/" + sys.argv[2]
     
     # my reader
@@ -738,7 +735,7 @@ if __name__ == "__main__":
     # each teacher has preferances
     permissions = __get_teach_poate__(teachers)
     
-    # constanta care reglează raportul între explorare și exploatare (CP = 0 -> doar exploatare)
+    # constant
     CP = 1.0 / sqrt(2.0)
     
     if ok == 1:
@@ -746,10 +743,10 @@ if __name__ == "__main__":
         orar, nr_stari = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
         end_time1 = time.time()
         confl1 = __constr__(orar, permissions, rooms, teachers, courses)
-        # print(pretty_print_timetable(orar, filename))
-        with open('output.txt', 'a') as file:
-            # Write the content to the file
+
+        with open('output.txt', 'w') as file:
             file.write(pretty_print_timetable(orar, filename))
+            
     if ok == 2:
         cv, tree, nr_stari = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
         end_time2 = time.time()
@@ -765,58 +762,6 @@ if __name__ == "__main__":
             orar['Joi'] = tree['Joi']
         if 'Vineri' in tree:
             orar['Vineri'] = tree['Vineri']
-        # print(pretty_print_timetable(orar, filename))
-        with open('output.txt', 'a') as file:
-            # Write the content to the file
+            
+        with open('output.txt', 'w') as file:
             file.write(pretty_print_timetable(orar, filename))
-    if ok == 3:
-        orar1, nr_stari1 = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
-        end_time21 = time.time()
-        confl1 = __constr__(orar1, permissions, rooms, teachers, courses)
-        time1 = end_time21 - start_time
-        with open('output.txt', 'a') as file:
-            # Write the content to the file
-            file.write(pretty_print_timetable(orar1, filename))
-        
-        cv1, tree1, nr_stari2 = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
-        end_time22 = time.time()
-        orar2 = {}
-        if 'Luni' in tree1:
-            orar2['Luni'] = tree1['Luni']
-        if 'Marti' in tree1:
-            orar2['Marti'] = tree1['Marti']
-        if 'Miercuri' in tree1:
-            orar2['Miercuri'] = tree1['Miercuri']
-        if 'Joi' in tree1:
-            orar2['Joi'] = tree1['Joi']
-        if 'Vineri' in tree1:
-            orar2['Vineri'] = tree1['Vineri']
-        confl2 = __constr__(orar2, permissions, rooms, teachers, courses)
-        time2 = end_time22 - start_time
-        with open('output.txt', 'a') as file:
-            # Write the content to the file
-            file.write(pretty_print_timetable(orar2, filename))
-        
-        # Grafic timp de executie
-        plt.bar(["HC", "MCTS"], [time1, time2])
-        plt.xlabel('Algoritm')
-        plt.ylabel('Timp')
-        plt.title('Comparatie timp')
-        plt.savefig('timp.png')
-        plt.close()
-        
-        # Grafic constrangeri
-        plt.bar(["HC", "MCTS"], [confl1, confl2])
-        plt.xlabel('Algoritm')
-        plt.ylabel('Numar conflicte')
-        plt.title('Comparatie conflicte')
-        plt.savefig('confl.png')
-        plt.close()
-        
-        # Grafic numar stari
-        plt.bar(["HC", "MCTS"], [nr_stari1, nr_stari2])
-        plt.xlabel('Algoritm')
-        plt.ylabel('Numar stari')
-        plt.title('Comparatie numar stari')
-        plt.savefig('stari.png')
-        plt.close()

@@ -2,7 +2,7 @@
 __pycache__
 
 # Ignore specific files
-ceva.txt
+*.txt
 check_constraints.py
 .DS_Store
 *.png
