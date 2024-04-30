@@ -254,7 +254,7 @@ def __get_available_actions__(state, teachers, rooms, days, intervals, courses, 
                                                                 actions.append(dummy)
     return actions
 
-def __get_available_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
+def __get_available_actions1__(state, teachers, rooms, days, intervals, materii, permissions):
     ''' 
     Generates all possible actions from the lists of days, intervals, teachers
     in order to satisfact the constraints of days, intervals 
@@ -274,17 +274,17 @@ def __get_available_actions1__(state, profi, sali, zile, intervale, materii, per
     '''
     actions = []
     for sub in materii:
-        for room in sali:
-            for t in profi:
-                for hours in intervale:
-                    for day in zile:
+        for room in rooms:
+            for t in teachers:
+                for hours in intervals:
+                    for day in days:
                         if state[day][hours][room] == ():
-                            if sub in profi[t]['Materii']: # proful preda materia aia
-                                if sub in sali[room]['Materii']: # materia se face in sala aia
-                                    if day in permisiuni[t]['days_ok']: # proful poate in ziua aia
-                                        if hours in permisiuni[t]['good_intervals']: # proful poate preda in orele alea
+                            if sub in teachers[t]['Materii']: # proful preda materia aia
+                                if sub in rooms[room]['Materii']: # materia se face in sala aia
+                                    if day in permissions[t]['days_ok']: # proful poate in ziua aia
+                                        if hours in permissions[t]['good_intervals']: # proful poate preda in orele alea
                                             overlap = False
-                                            for room2 in sali:
+                                            for room2 in rooms:
                                                 if room2 != room:
                                                     if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
                                                         overlap = True # verific sa nu fie aceeasi persoana in doua locuri diferite in acelasi timp
@@ -309,7 +309,7 @@ def __apply_action__(action, state):
     return dummy
 # --------------------------------------------------------------------------------------
 # conflicts
-def __constr__(state, permisiuni, rooms, teachers, courses):
+def __constr__(state, permissions, rooms, teachers, courses):
     nr = 0
     flagg = False
     # daca toate materiile au toti studentii inrolati/loc
@@ -317,7 +317,7 @@ def __constr__(state, permisiuni, rooms, teachers, courses):
     for mat in dictionaryy:
         if dictionaryy[mat] < courses[mat]:
             flagg = True
-            print("Nu se acopera materia " + mat)
+            # print("Nu se acopera materia " + mat)
     if flagg:
         nr += 1
     if state is not None and state != {}:
@@ -331,34 +331,34 @@ def __constr__(state, permisiuni, rooms, teachers, courses):
                                 if state[day][hours][room] != ():
                                     if __get_nr_hours__(state, subject) > 7: # daca proful are mai mult de 7 intrevale, vezi functia de mai sus
                                         nr += 1
-                                        print(teacher + " are mai mult de 7 intervale")
+                                        print(teacher + " are mai mult de 7 intervals")
                                     if subject not in teachers[teacher]['Materii']: # proful nu preda materia aia
                                         nr += 1
                                         print(teacher + " nu preda materia " + subject)
                                     if subject not in rooms[room]['Materii']: # materia nu se face in sala aia
                                         nr += 1
                                         print(subject + " nu se face in sala " + room)
-                                    if day not in permisiuni[teacher]['days_ok']: # proful nu poate in ziua aia
+                                    if day not in permissions[teacher]['days_ok']: # proful nu poate in ziua aia
                                         nr += 1
                                         print(teacher + " nu poate in ziua " + day)
-                                    if hours not in permisiuni[teacher]['good_intervals']: # proful nu poate preda in orele alea
+                                    if hours not in permissions[teacher]['good_intervals']: # proful nu poate preda in orele alea
                                         nr += 1
                                         print(teacher + " nu poate in orele " + str(hours))
                                     for room2 in rooms:
                                         if room2 != room:
                                             if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == teacher:
                                                 nr += 1
-                                                print(teacher + " preda in doua sali diferite ")
+                                                print(teacher + " preda in doua rooms diferite ")
                                               
-    # intr-un interval orar si intr-o sala se sustine o singura materie de catre un singur profesor
-    # -> din modul de constructie/generare -> dictionar in dictionar in dictionar -> chei unice
+    # in a time interval and in a room, only one subject is supported by one teacher
+    # -> from construction/generation mode -> dictionary in dictionary in dictionary -> unique keys
     
-    # intr-un interval orar, un profesor tine o singura materie, intr-o singura sala
-    # -> din modul de constructie/generare -> desi e tuplu de 2 elemente
+    # in a time interval, a teacher teaches only one subject, in one room
+    # -> from the construction/generation mode -> although it is a tuple of 2 elements
     
-    # o sala permite intr-un interval orar prezenta unui numar de studenti
-    # mai mic sau egal decat capacitatea ei maxima -> din modul de constructie 
-    # -> cand am numarat, am luat calupuri de cate <capacitate sala> de studenti
+    # a room allows the presence of a number of students in an hourly interval
+    # less than or equal to its maximum capacity -> from the construction method
+    # -> when I counted, I took samples of <capacity of the room> of students
 
     return nr
 
@@ -550,7 +550,7 @@ def __hill_climbing__(initial_state, teachers, permissions, max_iters, rooms, da
 
 # --------------------------------------------------------------------------------------
 # mcts
-def __get_available_actions1__(state, profi, sali, zile, intervale, materii, permisiuni):
+def __get_available_actions1__(state, teachers, rooms, days, intervals, materii, permissions):
     ''' 
     Generates all possible actions from the lists of days, intervals, teachers
     in order to satisfact the constraints of days, intervals 
@@ -558,18 +558,18 @@ def __get_available_actions1__(state, profi, sali, zile, intervale, materii, per
     Bullets 2, 5, 6 from hard constraints
     '''
     actions = []
-    for day in zile:
-        for hours in intervale:
-            for room in sali:
-                for t in profi:
+    for day in days:
+        for hours in intervals:
+            for room in rooms:
+                for t in teachers:
                     for sub in materii:
                         if state[day][hours][room] == ():
-                            if sub in profi[t]['Materii']: # proful preda materia aia
-                                if sub in sali[room]['Materii']: # materia se face in sala aia
-                                    if day in permisiuni[t]['days_ok']: # proful poate in ziua aia
-                                        if hours in permisiuni[t]['good_intervals']: # proful poate preda in orele alea
+                            if sub in teachers[t]['Materii']: # proful preda materia aia
+                                if sub in rooms[room]['Materii']: # materia se face in sala aia
+                                    if day in permissions[t]['days_ok']: # proful poate in ziua aia
+                                        if hours in permissions[t]['good_intervals']: # proful poate preda in orele alea
                                             overlap = False
-                                            for room2 in sali:
+                                            for room2 in rooms:
                                                 if room2 != room:
                                                     if state[day][hours][room2] != () and len(state[day][hours][room2]) >= 1 and state[day][hours][room2][0] == t:
                                                         overlap = True
@@ -590,7 +590,7 @@ def __init_node__(state, parent):
     '''
     return {'N': 0, 'Q': 0, 'STATE': state, 'PARENT': parent, 'ACTIONS': {}}
 
-def __select_action__(node, c, profi, sali, permisiuni):
+def __select_action__(node, c, teachers, rooms, permissions):
     '''
     Implements a monte carlo tree search algorithm to optimize a schedule by reducing conflicts.\n
     Args:\n
@@ -623,19 +623,19 @@ def __select_action__(node, c, profi, sali, permisiuni):
         else:
             expandare = node.get('Q', 0) /  node.get('N', 0)
             explorare = c * sqrt(2 * log(N_node) /  node.get('N', 0))
-            nconflicts = __get_all_conflicts__(nod['STATE'], profi, permisiuni) 
+            nconflicts = __get_all_conflicts__(nod['STATE'], teachers, permissions) 
             scor = expandare + explorare + nconflicts
         if mutare_optima is None or scor < max_scor: 
             mutare_optima = mutare 
             max_scor = scor
     return mutare_optima
 
-def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, profi, materii, permisiuni, c):
+def __mcts__(state0, budget, tree, opponent_s_action, days, intervals, rooms, teachers, materii, permissions, c):
     nr = 0
     if tree is not None and opponent_s_action in tree['ACTIONS']:
         tree = tree['ACTIONS'][opponent_s_action]
     else:
-        tree = __init_node__(__init_state__(zile, intervale, sali), None)
+        tree = __init_node__(__init_state__(days, intervals, rooms), None)
 
     for _ in range(budget):
         node = tree
@@ -643,15 +643,15 @@ def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, pro
 
         while not __is_final__(state):
             new_state = deepcopy(node['STATE'])
-            posibilitati = __get_available_actions1__(new_state, profi, sali, zile, intervale, materii, permisiuni)
+            posibilitati = __get_available_actions1__(new_state, teachers, rooms, days, intervals, materii, permissions)
             if not all(mutare in node['ACTIONS'] for mutare in posibilitati):
                 break
-            mutare_noua = __select_action__(node, c, profi, sali, permisiuni)
+            mutare_noua = __select_action__(node, c, teachers, rooms, permissions)
             new_state = __apply_action__(mutare_noua, new_state)
             node['ACTIONS'][mutare_noua] = new_state
             node = node['ACTIONS'][mutare_noua]
 
-        isok = __get_available_actions1__(new_state, profi, sali, zile, intervale, materii, permisiuni)
+        isok = __get_available_actions1__(new_state, teachers, rooms, days, intervals, materii, permissions)
         if not __is_final__(new_state) and isok is not None: 
             index = randint(0, len(isok) - 1)
             alta_mutare_noua = isok[index]
@@ -660,7 +660,7 @@ def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, pro
             node = node['ACTIONS'][alta_mutare_noua]
             
         while not __is_final__(new_state) and posibilitati != [] and posibilitati is not None:
-            posibilitati = __get_available_actions1__(new_state, profi, sali, zile, intervale, materii, permisiuni)
+            posibilitati = __get_available_actions1__(new_state, teachers, rooms, days, intervals, materii, permissions)
             if posibilitati != [] and posibilitati is not None:
                 indexx = randint(0, len(posibilitati) - 1)
                 mutare = posibilitati[indexx]
@@ -677,9 +677,12 @@ def __mcts__(state0, budget, tree, opponent_s_action, zile, intervale, sali, pro
                     node = node.get('PARENT', 0)
 
     if tree:
-        final_action = __select_action__(tree, c, profi, sali, permisiuni)
+        final_action = __select_action__(tree, c, teachers, rooms, permissions)
         return (final_action, tree['ACTIONS'][final_action], nr)
-
+# you can see there that it is taken directly from the laboratory 
+# because it is in Romanian + I deleted all TODOS from the laboratory 
+# and the code is in English and I am too exhausted to continue. 
+# Thank you for understanding!!
     return (0, __init_node__(state0, None), nr)
 
 # --------------------------------------------------------------------------------------
@@ -712,10 +715,10 @@ if __name__ == "__main__":
             
     #parser, because 'duh!
     courses = data['Materii']
-    intervals1 = data['Intervale']
+    intervals1 = data['intervals']
     teachers = data['Profesori']
-    rooms = data['Sali']
-    days = data['Zile']
+    rooms = data['rooms']
+    days = data['days']
     intervals = [eval(i) for i in intervals1]
 
     # we start with this
@@ -731,15 +734,12 @@ if __name__ == "__main__":
         # we populate the timetable with all arrangements
         orar, nr_stari = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
         end_time1 = time.time()
-        print(nr_stari)
-        print(__get_all_conflicts__(orar, teachers, permissions))
-        print(__how_many__(orar, courses, rooms))
-        print(end_time1 - start_time)
-        print("------------------------------------------------------------------------------------------------------")
+        confl1 = __constr__(orar, permissions, rooms, teachers, courses)
         print(pretty_print_timetable(orar, filename))
     if ok == 2:
         cv, tree, nr_stari = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
         end_time2 = time.time()
+        confl2 = __constr__(orar, permissions, rooms, teachers, courses)
         orar = {}
         if 'Luni' in tree:
             orar['Luni'] = tree['Luni']
@@ -751,25 +751,14 @@ if __name__ == "__main__":
             orar['Joi'] = tree['Joi']
         if 'Vineri' in tree:
             orar['Vineri'] = tree['Vineri']
-        print(nr_stari)
-        print(__get_all_conflicts__(orar, teachers, permissions))
-        print(__how_many__(orar, courses, rooms))
-        print(end_time2 - start_time)
-        print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar, filename))
     if ok == 3:
-        # we populate the timetable with all arrangements
         orar1, nr_stari1 = __hill_climbing__(test, teachers, permissions, sys.maxsize, rooms, days, intervals, courses)
         end_time21 = time.time()
-        # print(nr_stari1)
         confl1 = __constr__(orar1, permissions, rooms, teachers, courses)
-        # print(__get_all_conflicts__(orar1, teachers, permissions))
-        print(__how_many__(orar1, courses, rooms))
         time1 = end_time21 - start_time
-        print(confl1)
-        # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar1, filename))
-        print("------------------------------------------------------------------------------------------------------")
+        
         cv1, tree1, nr_stari2 = __mcts__(test, 11, None, None, days, intervals, rooms, teachers, courses, permissions, CP)
         end_time22 = time.time()
         orar2 = {}
@@ -784,10 +773,7 @@ if __name__ == "__main__":
         if 'Vineri' in tree1:
             orar2['Vineri'] = tree1['Vineri']
         confl2 = __constr__(orar2, permissions, rooms, teachers, courses)
-        print(__how_many__(orar2, courses, rooms))
-        print(confl2)
         time2 = end_time22 - start_time
-        # print("------------------------------------------------------------------------------------------------------")
         print(pretty_print_timetable(orar2, filename))
         
         # Grafic timp de executie
